@@ -590,8 +590,33 @@ async function loadAll() {
 
 function paintStatus(d) {
   $('#hdr').textContent = d.ip + '  ·  ' + d.time.replace('T', ' ') + ' ' + d.abbr;
+  const t = e => new Date(e * 1000).toLocaleTimeString([],
+    {hour: 'numeric', minute: '2-digit', timeZone: $('#tz').value});
+  const when = e => {
+    if (!e) return '—';
+    const d2 = new Date(e * 1000), now = Date.now() / 1000;
+    const sameDay = Math.abs(e - now) < 86400 &&
+                    d2.toDateString() === new Date().toDateString();
+    return t(e) + (sameDay ? '' : ' ' + d2.toLocaleDateString([], {month: 'short', day: 'numeric'}));
+  };
+
+  let showing;
+  if (d.source === 'schedule') {
+    showing = pill('schedule entry ' + (d.entry + 1), 'ok') +
+              (d.since ? ' <span style="color:var(--dim)">since ' + when(d.since) + '</span>' : '');
+  } else {
+    showing = pill('default settings', '') +
+              ' <span style="color:var(--dim)">no schedule entry applies</span>';
+  }
+
   const rows = [
     ['Local time', d.time.replace('T', ' ') + ' ' + d.abbr + (d.dst ? ' (DST)' : '')],
+    ['Showing', showing],
+    ['Next change', d.next ? when(d.next) : 'nothing scheduled'],
+    ['Sun today', d.sun_valid ? ('&uarr; ' + t(d.sunrise) + ' &nbsp; &darr; ' + t(d.sunset))
+                              : 'no sunrise/sunset at this latitude'],
+    ['Effect', d.fx_name + ' &nbsp;<span style="display:inline-block;width:11px;height:11px;' +
+      'border-radius:3px;vertical-align:-1px;background:rgb(' + d.lit.join(',') + ')"></span>'],
     ['Timezone rule', d.tz_ok ? pill('valid', 'ok') : pill('invalid — using default', 'bad')],
     ['NTP', !d.synced ? pill('never synced', 'bad')
         : d.ntp_stale ? pill('stale, ' + dur(d.ntp_age) + ' ago', 'warn')

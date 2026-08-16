@@ -50,6 +50,13 @@ uptime, not about total free bytes, and 40 KB of free heap does not fix fragment
    formula (computed 06:33/20:05 EDT vs actual 06:37/20:04 for Durham). The plan's
    verification bar is ≤2 minutes, so Phase 4 likely needs the fuller NOAA solar-position
    terms rather than the low-precision approximation used here.
+
+   > **Corrected in Phase 4.** The "actual" figures above were recalled, not looked up,
+   > which made this claim unreliable in both directions. Measured against `astral`
+   > across 69 sample days and 9 locations, the simplified formula is worst-case 347 s
+   > (5.8 min) and mean 76 s — worse than stated at high latitude, better than stated at
+   > Durham. The full NOAA implementation now in `src/solar.cpp` is worst-case 72 s, mean
+   > 20 s. See docs/phase4-results.md.
 5. **`shop-clock` sits at −71 dBm RSSI.** Workable, but the weaker end of usable — worth
    watching as a suspect if that clock ever shows connectivity trouble.
 

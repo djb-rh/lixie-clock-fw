@@ -11,10 +11,10 @@ firmware, which had compile-time colors and four hardcoded modes.
 
 ## Status
 
-**Phase 3 (effects) complete.** `shop-clock` keeps correct local time with full DST
-handling, is configurable from a browser at `http://<clock-ip>/`, and runs eight lighting
-effects at 30 fps. Scheduling and Home Assistant are Phases 4–5. See `docs/` for
-per-phase results.
+**Phase 4 (solar + scheduler) complete.** `shop-clock` keeps correct local time with full
+DST handling, is configurable from a browser at `http://<clock-ip>/`, runs eight lighting
+effects at 30 fps, and switches settings on a schedule that can be anchored to sunrise and
+sunset. Home Assistant is Phase 5. See `docs/` for per-phase results.
 
 ## Tests
 
@@ -29,6 +29,10 @@ scanner, which parses untrusted input off the network.
 
 `make vectors` regenerates `tz_vectors.txt`, which cross-checks the device's POSIX parser
 against the browser's Intl-derived rules across 38 zones (needs `node`).
+
+`tools/gen_solar_vectors.py` regenerates `solar_vectors.txt`, which checks the NOAA solar
+implementation against `astral` across 9 locations and 8 dates (needs `pip install astral`).
+Both vector files are committed, so `make` alone needs neither tool.
 
 ## Hardware
 

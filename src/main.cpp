@@ -18,6 +18,7 @@
 #include "Particle.h"
 
 #include "config.h"
+#include "control.h"
 #include "display.h"
 #include "httpd.h"
 #include "netwatch.h"
@@ -82,19 +83,24 @@ void renderNow(bool force) {
     int32_t stamp = lt.hour * 3600 + lt.minute * 60 +
                     (cfg.digits >= 6 ? lt.second : 0);
 
+    // What to draw comes from the layer stack, never straight from cfg -- a
+    // schedule entry (and, from Phase 5, Home Assistant) outranks the base
+    // settings, and Control is the single place that knows the precedence.
+    const Control::Settings act = Control::active();
+
     // FX_SOLID in effect mode is still a static display, so treat it as one.
-    const uint8_t fx = (cfg.mode == MODE_EFFECT) ? cfg.effect : (uint8_t)FX_SOLID;
+    const uint8_t fx = (act.mode == MODE_EFFECT) ? act.effect : (uint8_t)FX_SOLID;
     const bool animated = (fx != FX_SOLID);
 
     if (!animated && !force && g_last.valid && g_last.stamp == stamp &&
-        g_last.r == cfg.r && g_last.g == cfg.g && g_last.b == cfg.b &&
-        g_last.brightness == cfg.brightness && g_last.digits == cfg.digits &&
+        g_last.r == act.r && g_last.g == act.g && g_last.b == act.b &&
+        g_last.brightness == act.brightness && g_last.digits == cfg.digits &&
         g_last.effect == fx) {
         return;
     }
 
-    Display::renderClock(lt, fx, Rgb8{cfg.r, cfg.g, cfg.b}, cfg.brightness, millis());
-    g_last = Rendered{stamp, cfg.r, cfg.g, cfg.b, cfg.brightness, cfg.digits, fx, true};
+    Display::renderClock(lt, fx, Rgb8{act.r, act.g, act.b}, act.brightness, millis());
+    g_last = Rendered{stamp, act.r, act.g, act.b, act.brightness, cfg.digits, fx, true};
 }
 
 void updateStatus() {
@@ -166,6 +172,7 @@ void setup() {
     Display::begin();
     Display::setDigitCount(cfg.digits);
     Timekeep::begin();
+    Control::begin();
 
     Particle.variable("freemem", vFreeMem);
     Particle.variable("bootcount", vBootCount);
@@ -199,6 +206,7 @@ void loop() {
 
     NetWatch::tick();
     Timekeep::tick();
+    Control::tick();
     if (NetWatch::wifiUp()) Httpd::tick();
 
     if (now - g_lastRender >= FRAME_MS) {

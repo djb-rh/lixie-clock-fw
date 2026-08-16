@@ -3,6 +3,7 @@
 #include <stdarg.h>
 
 #include "config.h"
+#include "control.h"
 #include "display.h"
 #include "json.h"
 #include "netwatch.h"
@@ -156,8 +157,12 @@ const char *resetReasonName(int r) {
 
 void serveState(TCPClient &c) {
     LocalTime lt = Timekeep::now();
-    const uint8_t fxNow = (cfg.mode == MODE_EFFECT && cfg.effect < FX_COUNT)
-                          ? cfg.effect : (uint8_t)FX_SOLID;
+    // From the RESOLVED layer, not from cfg. Reading the base config here made
+    // the status report "Solid" while a schedule entry was visibly running
+    // Breathe -- a diagnostic that lies is worse than no diagnostic.
+    const Control::Settings actNow = Control::active();
+    const uint8_t fxNow = (actNow.mode == MODE_EFFECT && actNow.effect < FX_COUNT)
+                          ? actNow.effect : (uint8_t)FX_SOLID;
     const TzInfo &tz = Timekeep::tz();
 
     int n = snprintf(g_out, sizeof(g_out),
@@ -174,6 +179,8 @@ void serveState(TCPClient &c) {
         // land. Wait for this string to change instead.
         "\"auth\":%s,\"digits\":%u,\"leds\":%u,\"frames\":%lu,"
         "\"fx\":%u,\"fx_name\":\"%s\",\"lit\":[%u,%u,%u],"
+        "\"brightness\":%u,\"source\":\"%s\",\"entry\":%d,\"since\":%lu,\"next\":%lu,"
+        "\"sunrise\":%lu,\"sunset\":%lu,\"sun_valid\":%s,"
         "\"build\":\"" __DATE__ " " __TIME__ "\""
         "}",
         lt.year, lt.month, lt.day, lt.hour, lt.minute, lt.second,
@@ -196,7 +203,18 @@ void serveState(TCPClient &c) {
         cfg.digits, Display::ledCount(), (unsigned long)Display::frameCount(),
         fxNow, EFFECT_NAMES[fxNow],
         Display::lastLitColor().r, Display::lastLitColor().g,
-        Display::lastLitColor().b);
+        Display::lastLitColor().b,
+        // NOT %lld: newlib-nano's printf has no long-long support, and passing
+        // one silently emits the literal "ld" and then desynchronises every
+        // argument after it -- which is how this endpoint started returning
+        // corrupt JSON with trailing garbage. Epochs are positive and fit an
+        // unsigned 32-bit value until 2106, which outlives the hardware.
+        actNow.brightness,
+        Control::sourceName(), (int)Control::scheduleEntry(),
+        (unsigned long)Control::since(), (unsigned long)Control::nextChange(),
+        (unsigned long)Control::sunToday().rise_utc,
+        (unsigned long)Control::sunToday().set_utc,
+        Control::sunToday().valid ? "true" : "false");
 
     if (n < 0 || (size_t)n >= sizeof(g_out)) {
         sendErr(c, "500 Internal Server Error", "state truncated");
@@ -484,6 +502,7 @@ void handle(TCPClient &c, const char *req, const char *body, size_t bodyLen) {
             return;
         }
         configSave();
+        Control::invalidate();
         sendOk(c);
     } else if (isPost && !strncmp(path, "/api/schedule", 13)) {
         char err[96] = "";
@@ -492,6 +511,7 @@ void handle(TCPClient &c, const char *req, const char *body, size_t bodyLen) {
             return;
         }
         configSave();
+        Control::invalidate();
         sendOk(c);
     } else if (isPost && !strncmp(path, "/api/action", 11)) {
         char what[24] = "";

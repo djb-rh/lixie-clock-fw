@@ -1,6 +1,6 @@
 CXXFLAGS = -std=c++14 -Wall -Wextra -O1 -g
 
-TESTS = tz_test config_test json_test tzvec_test effects_test
+TESTS = tz_test config_test json_test tzvec_test effects_test solar_test schedule_test
 
 all: $(TESTS)
 	@for t in $(TESTS); do echo "=== $$t ==="; ./$$t || exit 1; echo; done
@@ -35,3 +35,9 @@ clean:
 
 effects_test: effects_test.cpp ../src/effects.cpp ../src/effects.h
 	$(CXX) $(CXXFLAGS) -o $@ effects_test.cpp ../src/effects.cpp
+
+solar_test: solar_test.cpp ../src/solar.cpp ../src/tz.cpp ../src/solar.h
+	$(CXX) $(CXXFLAGS) -o $@ solar_test.cpp ../src/solar.cpp ../src/tz.cpp
+
+schedule_test: schedule_test.cpp ../src/schedule.cpp ../src/solar.cpp ../src/tz.cpp ../src/schedule.h
+	$(CXX) $(CXXFLAGS) -o $@ schedule_test.cpp ../src/schedule.cpp ../src/solar.cpp ../src/tz.cpp
