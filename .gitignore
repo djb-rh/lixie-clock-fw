@@ -1,0 +1,11 @@
+# Particle build output
+*.bin
+target/
+lib/
+.particle/
+
+# Generated web assets (regenerate with tools/build_web_assets.py)
+src/web_assets.h
+
+# macOS
+.DS_Store

@@ -1,0 +1,214 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Lixie Clock</title>
+<style>
+:root{--bg:#14161a;--card:#1d2026;--line:#2c313a;--fg:#e6e8ec;--dim:#9aa1ad;--accent:#ffb347;--ok:#4ade80;--warn:#fbbf24}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 system-ui,-apple-system,sans-serif}
+.wrap{max-width:680px;margin:0 auto;padding:16px}
+h1{font-size:20px;margin:8px 0 4px}
+h1 span{color:var(--dim);font-weight:400;font-size:14px}
+section{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;margin:12px 0}
+h2{font-size:14px;text-transform:uppercase;letter-spacing:.06em;color:var(--dim);margin:0 0 12px}
+label{display:block;margin:10px 0 4px;font-size:13px;color:var(--dim)}
+input,select,button{font:inherit;color:var(--fg);background:#141720;border:1px solid var(--line);border-radius:6px;padding:8px 10px;width:100%}
+input:focus,select:focus{outline:2px solid var(--accent);outline-offset:-1px}
+button{background:var(--accent);color:#1a1205;border:0;font-weight:600;cursor:pointer}
+button.sec{background:#252a33;color:var(--fg)}
+.row{display:flex;gap:10px}
+.row>*{flex:1}
+.hint{font-size:12px;color:var(--dim);margin-top:4px}
+.preview{margin-top:10px;padding:9px 11px;background:#141720;border-left:3px solid var(--accent);border-radius:4px;font-size:13px}
+details{margin-top:10px;border-top:1px solid var(--line);padding-top:10px}
+summary{cursor:pointer;font-size:13px;color:var(--accent)}
+details p{margin:10px 0;font-size:13px}
+details b{color:var(--fg)}
+dl{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:0;font-size:13px}
+dt{color:var(--dim)}
+dd{margin:0;text-align:right}
+.pill{display:inline-block;padding:1px 8px;border-radius:99px;font-size:12px;background:#252a33}
+.pill.ok{background:#14331f;color:var(--ok)}
+.pill.warn{background:#3a2d0c;color:var(--warn)}
+#ovr{display:none;background:#3a2d0c;border-left:3px solid var(--warn);padding:9px 11px;border-radius:4px;margin-bottom:12px;font-size:13px}
+</style>
+
+<div class="wrap">
+<h1>Lixie Clock <span id="devname"></span></h1>
+
+<section>
+  <h2>Time &amp; Location</h2>
+  <label for="tz">Timezone</label>
+  <select id="tz"></select>
+  <div class="hint">DST rules come from your browser and are stored on the clock as a POSIX rule.</div>
+
+  <label for="ntp">NTP server</label>
+  <input id="ntp" value="pool.ntp.org">
+
+  <div class="row">
+    <div><label for="lat">Latitude</label><input id="lat" placeholder="38.9072"></div>
+    <div><label for="lon">Longitude</label><input id="lon" placeholder="-77.0369"></div>
+  </div>
+  <div class="hint">West longitudes are negative &mdash; everywhere in the Americas starts with a minus sign.</div>
+  <div class="preview" id="solar">Enter your coordinates to preview sunrise and sunset.</div>
+  <button class="sec" id="auto" style="margin-top:10px">Auto-detect my location</button>
+
+  <details>
+    <summary>How do I find my coordinates?</summary>
+    <p><b>iPhone</b> &mdash; Open the built-in <b>Compass</b> app. Your latitude and
+    longitude are shown at the bottom of the screen, under the elevation.<br>
+    <i>Nothing showing?</i> Settings &rarr; Privacy &amp; Security &rarr; Location
+    Services &rarr; on, then <b>Compass</b> &rarr; <i>While Using the App</i>, and
+    turn on <b>Precise Location</b>.</p>
+    <p><b>Android</b> &mdash; Open <b>Google Maps</b> and tap the blue dot for your
+    current location. The card that slides up shows your coordinates. (Touch and
+    hold anywhere on the map to get the coordinates for that spot instead.)</p>
+    <p><b>Either phone</b> &mdash; Standing in the house is plenty accurate. Sunrise
+    and sunset barely move over a few hundred feet.</p>
+    <p>Paste either format: <code>38.9072, -77.0369</code> or
+    <code>38&deg;54'26" N, 77&deg;02'13" W</code>. Pasting both numbers at once into
+    the latitude box splits them for you.</p>
+  </details>
+</section>
+
+<section>
+  <h2>Display</h2>
+  <div id="ovr"></div>
+  <label for="mode">Mode</label>
+  <select id="mode"><option value="0">Solid color</option><option value="1">Effect</option></select>
+  <label for="effect">Effect</label>
+  <select id="effect"></select>
+  <label for="color">Color</label>
+  <input type="color" id="color" value="#ff8800">
+  <label for="bright">Brightness <span id="brightv">80%</span></label>
+  <input type="range" id="bright" min="1" max="100" value="80">
+  <label for="digits">Number of digits</label>
+  <select id="digits"><option>2</option><option>4</option><option>6</option></select>
+</section>
+
+<section>
+  <h2>Schedule</h2>
+  <div id="sched"></div>
+  <button class="sec" id="addrow" style="margin-top:10px">Add entry</button>
+  <div class="hint">Each entry is a transition point: at that moment the clock switches
+  to those settings and holds them until the next entry fires.</div>
+</section>
+
+<section>
+  <h2>Home Assistant</h2>
+  <label for="mqtthost">MQTT broker</label>
+  <input id="mqtthost" placeholder="homeassistant.local">
+  <div class="row">
+    <div><label for="mqttuser">Username</label><input id="mqttuser"></div>
+    <div><label for="mqttpass">Password</label><input id="mqttpass" type="password"></div>
+  </div>
+  <div class="hint">Discovery is published automatically; the clock appears as a light.</div>
+</section>
+
+<section>
+  <h2>Status</h2>
+  <dl id="status"></dl>
+  <div class="row" style="margin-top:12px">
+    <button class="sec" id="release">Return to schedule</button>
+    <button class="sec" id="resync">Resync NTP</button>
+  </div>
+</section>
+
+<button id="save">Save settings</button>
+<div class="hint" id="saveinfo" style="text-align:center;margin-top:8px"></div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+
+/* ---- coordinate parsing: decimal, DMS, or a pasted pair ---- */
+function parseCoord(s){
+  s = String(s).trim();
+  if(!s) return null;
+  const dms = s.match(/^(\d+(?:\.\d+)?)\s*[°d:\s]\s*(\d+(?:\.\d+)?)\s*['m:\s]\s*(?:(\d+(?:\.\d+)?)\s*["s]?)?\s*([NSEW])?$/i);
+  if(dms){
+    let v = +dms[1] + (+dms[2])/60 + (+(dms[3]||0))/3600;
+    if(dms[4] && /[SW]/i.test(dms[4])) v = -v;
+    return v;
+  }
+  const dec = s.match(/^([+-]?\d+(?:\.\d+)?)\s*°?\s*([NSEW])?$/i);
+  if(dec){
+    let v = +dec[1];
+    if(dec[2] && /[SW]/i.test(dec[2])) v = -v;
+    return v;
+  }
+  return null;
+}
+
+function splitPair(s){
+  const parts = String(s).split(/\s*,\s*/);
+  if(parts.length !== 2) return null;
+  const a = parseCoord(parts[0]), b = parseCoord(parts[1]);
+  return (a === null || b === null) ? null : [a, b];
+}
+
+/* ---- NOAA sunrise/sunset, mirrored from src/solar.cpp for live preview ---- */
+function solar(lat, lon, date){
+  const rad = Math.PI/180;
+  const start = Date.UTC(date.getUTCFullYear(), 0, 0);
+  const doy = Math.floor((Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()) - start) / 86400000);
+  const g = 357.529 + 0.98560028 * (doy - 1);
+  const decl = Math.asin(Math.sin(23.44*rad) * Math.sin((280.459 + 0.98564736*(doy-1) + 1.915*Math.sin(g*rad))*rad)) / rad;
+  const B = (doy - 81) * 2 * Math.PI / 364;
+  const eot = 9.87*Math.sin(2*B) - 7.53*Math.cos(B) - 1.5*Math.sin(B);
+  const ha = Math.cos(90.833*rad) / (Math.cos(lat*rad)*Math.cos(decl*rad)) - Math.tan(lat*rad)*Math.tan(decl*rad);
+  if(ha > 1) return null;            // polar night
+  if(ha < -1) return {up:true};      // midnight sun
+  const H = Math.acos(ha)/rad;
+  const noon = 720 - 4*lon - eot;    // UTC minutes
+  return {rise:(noon - 4*H), set:(noon + 4*H)};
+}
+
+function fmtLocal(utcMinutes, date){
+  const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 0, Math.round(utcMinutes)));
+  return d.toLocaleTimeString([], {hour:'numeric', minute:'2-digit', timeZone:$('#tz').value});
+}
+
+function updateSolar(){
+  const lat = parseCoord($('#lat').value), lon = parseCoord($('#lon').value);
+  const box = $('#solar');
+  if(lat === null || lon === null){
+    box.textContent = 'Enter your coordinates to preview sunrise and sunset.';
+    return;
+  }
+  if(Math.abs(lat) > 90 || Math.abs(lon) > 180){
+    box.textContent = 'That is out of range \u2014 latitude is \u00b190, longitude is \u00b1180.';
+    return;
+  }
+  const now = new Date();
+  const s = solar(lat, lon, now);
+  if(!s){ box.textContent = 'No sunrise today at that latitude (polar night).'; return; }
+  if(s.up){ box.textContent = 'The sun never sets today at that latitude.'; return; }
+  box.textContent = `That puts today's sunrise at ${fmtLocal(s.rise, now)} and sunset at ${fmtLocal(s.set, now)}.`;
+}
+
+/* ---- wiring ---- */
+function initTz(){
+  const sel = $('#tz');
+  const zones = Intl.supportedValuesOf ? Intl.supportedValuesOf('timeZone') : [];
+  const here = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  for(const z of zones){
+    const o = document.createElement('option');
+    o.value = o.textContent = z;
+    if(z === here) o.selected = true;
+    sel.appendChild(o);
+  }
+}
+
+$('#lat').addEventListener('input', e => {
+  const pair = splitPair(e.target.value);
+  if(pair){ e.target.value = pair[0]; $('#lon').value = pair[1]; }
+  updateSolar();
+});
+$('#lon').addEventListener('input', updateSolar);
+$('#tz').addEventListener('change', updateSolar);
+$('#bright').addEventListener('input', e => $('#brightv').textContent = e.target.value + '%');
+
+initTz();
+updateSolar();
+</script>
