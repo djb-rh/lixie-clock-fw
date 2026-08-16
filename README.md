@@ -11,10 +11,10 @@ firmware, which had compile-time colors and four hardcoded modes.
 
 ## Status
 
-**Phase 2 (web server + config UI) complete.** `shop-clock` keeps correct local time with
-full DST handling, and every setting is configurable from a browser at
-`http://<clock-ip>/`. Effects, scheduling and Home Assistant are Phases 3–5. See `docs/`
-for per-phase results.
+**Phase 3 (effects) complete.** `shop-clock` keeps correct local time with full DST
+handling, is configurable from a browser at `http://<clock-ip>/`, and runs eight lighting
+effects at 30 fps. Scheduling and Home Assistant are Phases 4–5. See `docs/` for
+per-phase results.
 
 ## Tests
 

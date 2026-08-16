@@ -156,6 +156,8 @@ const char *resetReasonName(int r) {
 
 void serveState(TCPClient &c) {
     LocalTime lt = Timekeep::now();
+    const uint8_t fxNow = (cfg.mode == MODE_EFFECT && cfg.effect < FX_COUNT)
+                          ? cfg.effect : (uint8_t)FX_SOLID;
     const TzInfo &tz = Timekeep::tz();
 
     int n = snprintf(g_out, sizeof(g_out),
@@ -170,7 +172,9 @@ void serveState(TCPClient &c) {
         // merely *answers* is useless after an OTA -- the outgoing firmware
         // answers too, so you read stale values and conclude your fix did not
         // land. Wait for this string to change instead.
-        "\"auth\":%s,\"digits\":%u,\"leds\":%u,\"build\":\"" __DATE__ " " __TIME__ "\""
+        "\"auth\":%s,\"digits\":%u,\"leds\":%u,\"frames\":%lu,"
+        "\"fx\":%u,\"fx_name\":\"%s\",\"lit\":[%u,%u,%u],"
+        "\"build\":\"" __DATE__ " " __TIME__ "\""
         "}",
         lt.year, lt.month, lt.day, lt.hour, lt.minute, lt.second,
         lt.abbr[0] ? lt.abbr : "UTC", lt.is_dst ? "true" : "false",
@@ -189,7 +193,10 @@ void serveState(TCPClient &c) {
         resetReasonName(NetWatch::lastResetReason()),
         (unsigned long)g_requests,
         cfg.web_pass[0] ? "true" : "false",
-        cfg.digits, Display::ledCount());
+        cfg.digits, Display::ledCount(), (unsigned long)Display::frameCount(),
+        fxNow, EFFECT_NAMES[fxNow],
+        Display::lastLitColor().r, Display::lastLitColor().g,
+        Display::lastLitColor().b);
 
     if (n < 0 || (size_t)n >= sizeof(g_out)) {
         sendErr(c, "500 Internal Server Error", "state truncated");
@@ -202,8 +209,17 @@ void serveState(TCPClient &c) {
 // --- GET /api/config --------------------------------------------------------
 
 void serveConfig(TCPClient &c) {
-    int n = snprintf(g_out, sizeof(g_out),
-        "{\"tz\":\"%s\",\"ntp\":\"%s\",\"lat\":%.4f,\"lon\":%.4f,"
+    Out o{g_out, g_out + sizeof(g_out), false};
+
+    // The effect list is served from EFFECT_NAMES rather than duplicated in the
+    // page, so the UI, the firmware and the Home Assistant effect_list cannot
+    // drift apart -- a mismatch would show the wrong effect name for an id.
+    app(o, "{\"effects\":[");
+    for (uint8_t i = 0; i < FX_COUNT; i++)
+        app(o, "%s\"%s\"", i ? "," : "", EFFECT_NAMES[i]);
+    app(o, "],");
+
+    app(o, "\"tz\":\"%s\",\"ntp\":\"%s\",\"lat\":%.4f,\"lon\":%.4f,"
         "\"digits\":%u,\"hour_format\":%u,\"blank_hour_zero\":%u,"
         "\"mode\":%u,\"effect\":%u,\"r\":%u,\"g\":%u,\"b\":%u,\"brightness\":%u,"
         "\"mqtt_host\":\"%s\",\"mqtt_port\":%u,\"mqtt_user\":\"%s\","
@@ -215,11 +231,12 @@ void serveConfig(TCPClient &c) {
         cfg.mqtt_pass[0] ? "true" : "false",
         cfg.web_pass[0] ? "true" : "false");
 
-    if (n < 0 || (size_t)n >= sizeof(g_out)) {
+    if (o.overflow) {
         sendErr(c, "500 Internal Server Error", "config truncated");
         return;
     }
-    sendHeaders(c, "200 OK", "application/json", (size_t)n);
+    size_t n = (size_t)(o.p - g_out);
+    sendHeaders(c, "200 OK", "application/json", n);
     c.write((const uint8_t *)g_out, n);
 }
 
@@ -286,7 +303,7 @@ bool applyConfig(const char *body, size_t len, char *err, size_t errn) {
         applied++;
     }
     if (jsonGetInt(body, len, "effect", v)) {
-        cfg.effect = (uint8_t)constrain(v, 0, 15);
+        cfg.effect = (uint8_t)constrain(v, 0, FX_COUNT - 1);
         applied++;
     }
     if (jsonGetInt(body, len, "r", v)) {
@@ -415,7 +432,8 @@ bool applySchedule(const char *body, size_t len, char *err, size_t errn) {
         s.minutes = (int16_t)v;
 
         s.mode = jsonGetInt(e.p, e.len, "mode", v) ? (uint8_t)constrain(v, 0, 1) : 0;
-        s.effect = jsonGetInt(e.p, e.len, "effect", v) ? (uint8_t)constrain(v, 0, 15) : 0;
+        s.effect = jsonGetInt(e.p, e.len, "effect", v)
+                   ? (uint8_t)constrain(v, 0, FX_COUNT - 1) : 0;
         s.r = jsonGetInt(e.p, e.len, "r", v) ? (uint8_t)constrain(v, 0, 255) : 255;
         s.g = jsonGetInt(e.p, e.len, "g", v) ? (uint8_t)constrain(v, 0, 255) : 136;
         s.b = jsonGetInt(e.p, e.len, "b", v) ? (uint8_t)constrain(v, 0, 255) : 0;

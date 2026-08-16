@@ -8,7 +8,11 @@ Adafruit_NeoPixel strip(MAX_DIGITS * LEDS_PER_DIGIT, PIXEL_PIN, WS2812B);
 uint8_t g_digits = 4;
 
 // Working buffer at full brightness; the dimmer is applied on the way out.
-Rgb g_buf[MAX_DIGITS * LEDS_PER_DIGIT];
+Rgb8 g_buf[MAX_DIGITS * LEDS_PER_DIGIT];
+
+const uint8_t BLANK = 0xFF;
+
+uint32_t g_frames = 0;
 }  // namespace
 
 void Display::begin() {
@@ -35,7 +39,7 @@ void Display::clear() {
     memset(g_buf, 0, sizeof(g_buf));
 }
 
-void Display::setNumeral(uint8_t panel, uint8_t numeral, Rgb c) {
+void Display::setNumeral(uint8_t panel, uint8_t numeral, Rgb8 c) {
     if (panel >= g_digits || numeral > 9) return;
     uint16_t i = ledIndex(panel, numeral);
     g_buf[i] = c;
@@ -57,10 +61,24 @@ void Display::show(uint8_t brightness_pct) {
         strip.setPixelColor(i, 0, 0, 0);
     }
     strip.show();
+    g_frames++;
 }
 
-void Display::renderClock(const LocalTime &lt, Rgb c, uint8_t brightness_pct) {
-    clear();
+uint32_t Display::frameCount() { return g_frames; }
+
+Rgb8 Display::lastLitColor() {
+    for (uint16_t i = 0; i < ledCount(); i++)
+        if (g_buf[i].r || g_buf[i].g || g_buf[i].b) return g_buf[i];
+    return Rgb8{0, 0, 0};
+}
+
+void Display::renderClock(const LocalTime &lt, uint8_t effect, Rgb8 base,
+                          uint8_t brightness_pct, uint32_t t_ms) {
+    // Decide which numeral each panel shows, then colour them. Keeping layout
+    // separate from colouring is what lets an effect know a panel's position on
+    // the display without duplicating the time-formatting rules.
+    uint8_t lit[MAX_DIGITS];
+    for (uint8_t i = 0; i < MAX_DIGITS; i++) lit[i] = BLANK;
 
     int hour = lt.hour;
     if (cfg.hour_format == 12) {
@@ -71,23 +89,28 @@ void Display::renderClock(const LocalTime &lt, Rgb c, uint8_t brightness_pct) {
     // Panels fill from the right, so a 4-digit clock shows hh:mm and a 6-digit
     // one shows hh:mm:ss without any per-size special casing.
     int8_t p = (int8_t)g_digits - 1;
-
     if (g_digits >= 6) {
-        setNumeral(p--, lt.second % 10, c);
-        setNumeral(p--, (lt.second / 10) % 10, c);
+        lit[p--] = (uint8_t)(lt.second % 10);
+        lit[p--] = (uint8_t)((lt.second / 10) % 10);
     }
     if (g_digits >= 4) {
-        setNumeral(p--, lt.minute % 10, c);
-        setNumeral(p--, (lt.minute / 10) % 10, c);
+        lit[p--] = (uint8_t)(lt.minute % 10);
+        lit[p--] = (uint8_t)((lt.minute / 10) % 10);
     }
-    if (p >= 0) setNumeral(p--, hour % 10, c);
+    if (p >= 0) lit[p--] = (uint8_t)(hour % 10);
     if (p >= 0) {
         uint8_t tens = (uint8_t)((hour / 10) % 10);
         // Blank the leading zero in 12-hour mode: 9:05, not 09:05.
         if (!(tens == 0 && cfg.hour_format == 12 && cfg.blank_hour_zero)) {
-            setNumeral(p, tens, c);
+            lit[p] = tens;
         }
     }
 
+    clear();
+    for (uint8_t i = 0; i < g_digits; i++) {
+        if (lit[i] == BLANK) continue;
+        EffectCtx ctx{i, g_digits, lit[i], t_ms, base};
+        setNumeral(i, lit[i], effectColor(effect, ctx));
+    }
     show(brightness_pct);
 }

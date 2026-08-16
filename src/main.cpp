@@ -47,12 +47,19 @@ char vTzProbe[56] = "";
 uint32_t g_lastStatus = 0;
 uint32_t g_lastRender = 0;
 
-// Re-render only when something visible actually changed. Phase 3 replaces this
-// with a continuous frame loop; until then there is no reason to bit-bang the
-// strip (and hold off interrupts) 50 times a second to draw a static display.
+// ~30 fps rather than 50.
+//
+// NeoPixel::show() disables interrupts for the whole transmission -- about
+// 2.4 ms for 80 LEDs at 800 kHz. At 50 fps that is 12% of wall-clock time with
+// interrupts off, which is a lot to take away from the Wi-Fi stack for effects
+// that are all slow gradients anyway. 33 ms halves it and looks identical.
+const uint32_t FRAME_MS = 33;
+
+// A static display still re-renders only when something visible changed: there
+// is no reason to bit-bang the strip at all when the colour is not moving.
 struct Rendered {
     int32_t stamp = -1;      // hh*3600 + mm*60 + ss, or -1 for "nothing drawn yet"
-    uint8_t r = 0, g = 0, b = 0, brightness = 0, digits = 0;
+    uint8_t r = 0, g = 0, b = 0, brightness = 0, digits = 0, effect = 0;
     bool valid = false;
 } g_last;
 
@@ -64,7 +71,7 @@ void renderNow(bool force) {
         // without pretending to be a clock.
         if (force || g_last.valid) {
             Display::clear();
-            Display::setNumeral(Display::digitCount() - 1, 8, Rgb{40, 20, 0});
+            Display::setNumeral(Display::digitCount() - 1, 8, Rgb8{40, 20, 0});
             Display::show(cfg.brightness);
             g_last = Rendered{};
         }
@@ -75,14 +82,19 @@ void renderNow(bool force) {
     int32_t stamp = lt.hour * 3600 + lt.minute * 60 +
                     (cfg.digits >= 6 ? lt.second : 0);
 
-    if (!force && g_last.valid && g_last.stamp == stamp &&
+    // FX_SOLID in effect mode is still a static display, so treat it as one.
+    const uint8_t fx = (cfg.mode == MODE_EFFECT) ? cfg.effect : (uint8_t)FX_SOLID;
+    const bool animated = (fx != FX_SOLID);
+
+    if (!animated && !force && g_last.valid && g_last.stamp == stamp &&
         g_last.r == cfg.r && g_last.g == cfg.g && g_last.b == cfg.b &&
-        g_last.brightness == cfg.brightness && g_last.digits == cfg.digits) {
+        g_last.brightness == cfg.brightness && g_last.digits == cfg.digits &&
+        g_last.effect == fx) {
         return;
     }
 
-    Display::renderClock(lt, Rgb{cfg.r, cfg.g, cfg.b}, cfg.brightness);
-    g_last = Rendered{stamp, cfg.r, cfg.g, cfg.b, cfg.brightness, cfg.digits, true};
+    Display::renderClock(lt, fx, Rgb8{cfg.r, cfg.g, cfg.b}, cfg.brightness, millis());
+    g_last = Rendered{stamp, cfg.r, cfg.g, cfg.b, cfg.brightness, cfg.digits, fx, true};
 }
 
 void updateStatus() {
@@ -189,7 +201,7 @@ void loop() {
     Timekeep::tick();
     if (NetWatch::wifiUp()) Httpd::tick();
 
-    if (now - g_lastRender >= 100) {
+    if (now - g_lastRender >= FRAME_MS) {
         g_lastRender = now;
         renderNow(false);
     }

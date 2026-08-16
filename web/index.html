@@ -97,7 +97,7 @@ dd{margin:0;text-align:right;font-family:ui-monospace,monospace}
   <div id="effectwrap" style="display:none">
     <label for="effect">Effect</label>
     <select id="effect"></select>
-    <div class="hint">Effects are stored now and start animating in the next firmware phase.</div>
+    <div class="hint">Rainbow effects set their own colours; the others tint and modulate the colour below.</div>
   </div>
 
   <label for="color">Colour</label>
@@ -172,7 +172,12 @@ dd{margin:0;text-align:right;font-family:ui-monospace,monospace}
 'use strict';
 const $ = s => document.querySelector(s);
 const DAYS = ['Su','Mo','Tu','We','Th','Fr','Sa'];
-const EFFECTS = ['Solid','Rainbow Flow','Rainbow Cycle','Breathe','Pulse','Comet','Twinkle','Warm Glow'];
+
+// Filled from /api/config so the firmware's EFFECT_NAMES is the single source of
+// truth. A duplicated list here would silently mislabel effect ids the moment
+// the two drifted apart.
+let EFFECTS = ['Solid'];
+const fxOptions = () => EFFECTS.map((n, i) => '<option value="' + i + '">' + n + '</option>').join('');
 
 // The page is served from the device, but during development it is opened from a
 // file:// URL pointing at a real clock -- hence the override.
@@ -414,8 +419,7 @@ function schedRow(e) {
       '<div><label>Mode</label><select class="mode">' +
         '<option value="0">Solid</option><option value="1">Effect</option></select></div>' +
       '<div class="fxwrap"><label>Effect</label><select class="effect">' +
-        EFFECTS.map((n, i) => '<option value="' + i + '">' + n + '</option>').join('') +
-        '</select></div>' +
+        fxOptions() + '</select></div>' +
       '<div style="flex:0 0 62px"><label>Colour</label><input type="color" class="col"></div>' +
     '</div>' +
     '<div class="row">' +
@@ -547,6 +551,8 @@ async function loadAll() {
     get('/api/state'), get('/api/config'), get('/api/schedule'),
   ]);
 
+  if (Array.isArray(cf.effects) && cf.effects.length) EFFECTS = cf.effects;
+
   fillTzList(localStorage.getItem('lixiezone'));
   const derived = refreshTzRule();
   if (derived && derived !== cf.tz) {
@@ -570,7 +576,7 @@ async function loadAll() {
   if (cf.has_web_pass) $('#webpass').placeholder = 'already set — leave blank to keep';
 
   const fx = $('#effect');
-  fx.innerHTML = EFFECTS.map((n, i) => '<option value="' + i + '">' + n + '</option>').join('');
+  fx.innerHTML = fxOptions();
   fx.value = String(cf.effect);
   $('#effectwrap').style.display = (cf.mode === 1) ? '' : 'none';
 
