@@ -11,7 +11,17 @@ firmware, which had compile-time colors and four hardcoded modes.
 
 ## Status
 
-**Phase 0 (feasibility) complete.** See `docs/` and the plan for phase breakdown.
+**Phase 1 (core) complete** — `shop-clock` keeps correct local time with full DST
+handling. Web UI, effects, scheduling and Home Assistant are Phases 2–5. See `docs/` for
+per-phase results.
+
+## Tests
+
+Calendar, timezone and config-layout logic is Particle-free and tested on the host:
+
+```bash
+cd tests && make
+```
 
 ## Hardware
 

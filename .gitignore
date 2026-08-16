@@ -9,3 +9,6 @@ src/web_assets.h
 
 # macOS
 .DS_Store
+tests/tz_test
+tests/config_test
+tests/*.dSYM
