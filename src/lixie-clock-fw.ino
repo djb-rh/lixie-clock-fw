@@ -98,6 +98,16 @@ static void configSave() {
 // software-float and trig code so it shows up in the flash measurement.
 struct SolarTimes { int rise_min; int set_min; bool valid; };
 
+// Time.day() is day-of-MONTH. Feeding it to solarUTC() silently yields the
+// sunrise for some day in January -- convincing-looking and completely wrong.
+static int dayOfYear(int year, int month, int day) {
+    static const int cum[12] = {0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334};
+    int doy = cum[month - 1] + day;
+    bool leap = (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0);
+    if (leap && month > 2) doy++;
+    return doy;
+}
+
 static SolarTimes solarUTC(float lat, float lon, int doy) {
     const float RAD = 3.14159265f / 180.0f;
     float g = 357.529f + 0.98560028f * (doy - 1);
@@ -186,18 +196,22 @@ static void serveIndex(TCPClient &c) {
 // fixed buffer -- no String, which fragments the heap on Gen 2.
 static void serveState(TCPClient &c) {
     char body[512];
-    SolarTimes s = solarUTC(cfg.lat, cfg.lon, Time.day());
+    SolarTimes s = solarUTC(cfg.lat, cfg.lon,
+                            dayOfYear(Time.year(), Time.month(), Time.day()));
     int n = snprintf(body, sizeof(body),
         "{\"digits\":%u,\"mode\":%u,\"effect\":%u,\"rgb\":[%u,%u,%u],"
         "\"brightness\":%u,\"tz\":\"%s\",\"ntp\":\"%s\","
         "\"rssi\":%d,\"ip\":\"%s\",\"uptime\":%lu,\"freemem\":%lu,"
-        "\"ntp_age\":%lu,\"mqtt\":%d,\"sunrise\":%d,\"sunset\":%d}",
+        "\"ntp_age\":%lu,\"mqtt\":%d,\"sunrise\":%d,\"sunset\":%d,"
+        "\"y\":%d,\"mo\":%d,\"d\":%d,\"doy\":%d}",
         cfg.digits, cfg.mode, cfg.effect, cfg.r, cfg.g, cfg.b,
         cfg.brightness, cfg.tz, cfg.ntp_server,
         (int)WiFi.RSSI(), WiFi.localIP().toString().c_str(),
         (unsigned long)(millis() / 1000), (unsigned long)System.freeMemory(),
         (unsigned long)(ntpEverSynced ? (millis() - lastNtpSync) / 1000 : 0),
-        mqtt.isConnected() ? 1 : 0, s.rise_min, s.set_min);
+        mqtt.isConnected() ? 1 : 0, s.rise_min, s.set_min,
+        Time.year(), Time.month(), Time.day(),
+        dayOfYear(Time.year(), Time.month(), Time.day()));
 
     c.print("HTTP/1.0 200 OK\r\nContent-Type: application/json\r\n"
             "Access-Control-Allow-Origin: *\r\nContent-Length: ");
@@ -240,6 +254,13 @@ retained uint32_t lastResetReason;
 
 ApplicationWatchdog *wd;
 
+// Cloud variables: the plan's out-of-band rescue path, and the only way to read
+// the spike's real free-heap number without being in the room with the clock.
+int32_t vFreeMem = 0;
+int32_t vBootCount = 0;
+int32_t vResetReason = 0;
+char vIp[16] = "0.0.0.0";
+
 // ------------------------------------------------------------------- main ---
 uint32_t lastFrame = 0, lastNtpAttempt = 0, lastMqttAttempt = 0;
 uint8_t hue = 0;
@@ -254,12 +275,23 @@ void setup() {
     strip.setBrightness(cfg.brightness);
     strip.show();
 
+    vBootCount = (int32_t)bootCount;
+    vResetReason = (int32_t)lastResetReason;
+    Particle.variable("freemem", vFreeMem);
+    Particle.variable("bootcount", vBootCount);
+    Particle.variable("resetreason", vResetReason);
+    Particle.variable("ip", vIp, STRING);
+
     WiFi.on();
     WiFi.connect();
     Particle.connect();
 
     server.begin();
-    wd = new ApplicationWatchdog(60000, System.reset, 1536);
+
+    // 120 s rather than 60: generous margin so an OTA in progress can never
+    // race the watchdog on a clock nobody is standing next to. SYSTEM_THREAD
+    // keeps loop() (and therefore checkin()) running throughout an update.
+    wd = new ApplicationWatchdog(120000, System.reset, 1536);
 }
 
 void loop() {
@@ -280,8 +312,14 @@ void loop() {
         strip.show();
     }
 
+    // Free heap is the number that actually decides whether this fits; sample it
+    // continuously rather than once at boot so allocation churn shows up.
+    vFreeMem = (int32_t)System.freeMemory();
+
     if (WiFi.ready()) {
         httpTick();
+        strncpy(vIp, WiFi.localIP().toString().c_str(), sizeof(vIp) - 1);
+        vIp[sizeof(vIp) - 1] = 0;
 
         if (!ntpEverSynced && now - lastNtpAttempt > 30000) {
             lastNtpAttempt = now;
