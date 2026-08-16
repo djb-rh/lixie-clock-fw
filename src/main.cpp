@@ -19,6 +19,7 @@
 
 #include "config.h"
 #include "display.h"
+#include "httpd.h"
 #include "netwatch.h"
 #include "timekeep.h"
 
@@ -114,50 +115,10 @@ void updateStatus() {
              (unsigned long)NetWatch::wifiRecoveries(), NetWatch::lastResetReason());
 }
 
-// --- temporary Particle-function config surface, replaced in Phase 2 ---
-
-int fnSetTz(String arg) {
-    if (!Timekeep::setTz(arg.c_str())) return -1;
-    configSave();
-    renderNow(true);
-    return 0;
-}
-
-int fnSetColor(String arg) {
-    int r, g, b;
-    if (sscanf(arg.c_str(), "%d,%d,%d", &r, &g, &b) != 3) return -1;
-    if (r < 0 || r > 255 || g < 0 || g > 255 || b < 0 || b > 255) return -1;
-    cfg.r = (uint8_t)r; cfg.g = (uint8_t)g; cfg.b = (uint8_t)b;
-    configSave();
-    return 0;
-}
-
-int fnSetBright(String arg) {
-    int v = arg.toInt();
-    if (v < 1 || v > 100) return -1;
-    cfg.brightness = (uint8_t)v;
-    configSave();
-    return 0;
-}
-
-int fnSetDigits(String arg) {
-    int v = arg.toInt();
-    if (v < 2 || v > MAX_DIGITS) return -1;
-    cfg.digits = (uint8_t)v;
-    Display::setDigitCount(cfg.digits);
-    configSave();
-    renderNow(true);
-    return 0;
-}
-
-int fnSetHourFmt(String arg) {
-    int v = arg.toInt();
-    if (v != 12 && v != 24) return -1;
-    cfg.hour_format = (uint8_t)v;
-    configSave();
-    renderNow(true);
-    return 0;
-}
+// --- rescue path ---
+//
+// The config page owns settings now (Phase 2). What stays here is only what is
+// useful when a clock has fallen off the LAN and the web UI is unreachable.
 
 int fnResync(String) { return Timekeep::syncNow() ? 0 : -1; }
 
@@ -202,15 +163,12 @@ void setup() {
     Particle.variable("status", vStatus, STRING);
     Particle.variable("tzprobe", vTzProbe, STRING);
 
-    Particle.function("settz", fnSetTz);
-    Particle.function("setcolor", fnSetColor);
-    Particle.function("setbright", fnSetBright);
-    Particle.function("setdigits", fnSetDigits);
-    Particle.function("sethourfmt", fnSetHourFmt);
     Particle.function("resync", fnResync);
     Particle.function("reset", fnReset);
     Particle.function("tzat", fnTzAt);
     Particle.function("factory", fnFactory);
+
+    Httpd::begin();
 
     WiFi.on();
     WiFi.connect();
@@ -229,6 +187,7 @@ void loop() {
 
     NetWatch::tick();
     Timekeep::tick();
+    if (NetWatch::wifiUp()) Httpd::tick();
 
     if (now - g_lastRender >= 100) {
         g_lastRender = now;

@@ -11,17 +11,24 @@ firmware, which had compile-time colors and four hardcoded modes.
 
 ## Status
 
-**Phase 1 (core) complete** — `shop-clock` keeps correct local time with full DST
-handling. Web UI, effects, scheduling and Home Assistant are Phases 2–5. See `docs/` for
-per-phase results.
+**Phase 2 (web server + config UI) complete.** `shop-clock` keeps correct local time with
+full DST handling, and every setting is configurable from a browser at
+`http://<clock-ip>/`. Effects, scheduling and Home Assistant are Phases 3–5. See `docs/`
+for per-phase results.
 
 ## Tests
 
-Calendar, timezone and config-layout logic is Particle-free and tested on the host:
+Calendar, timezone, JSON and config-layout logic is Particle-free and tested on the host:
 
 ```bash
 cd tests && make
 ```
+
+`make asan` reruns everything under AddressSanitizer and UBSan — worth it for the JSON
+scanner, which parses untrusted input off the network.
+
+`make vectors` regenerates `tz_vectors.txt`, which cross-checks the device's POSIX parser
+against the browser's Intl-derived rules across 38 zones (needs `node`).
 
 ## Hardware
 

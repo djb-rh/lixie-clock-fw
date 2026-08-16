@@ -3,54 +3,69 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Lixie Clock</title>
 <style>
-:root{--bg:#14161a;--card:#1d2026;--line:#2c313a;--fg:#e6e8ec;--dim:#9aa1ad;--accent:#ffb347;--ok:#4ade80;--warn:#fbbf24}
+:root{--bg:#14161a;--card:#1d2026;--line:#2c313a;--fg:#e6e8ec;--dim:#9aa1ad;--accent:#ffb347;--ok:#4ade80;--warn:#fbbf24;--bad:#f87171}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 system-ui,-apple-system,sans-serif}
-.wrap{max-width:680px;margin:0 auto;padding:16px}
-h1{font-size:20px;margin:8px 0 4px}
-h1 span{color:var(--dim);font-weight:400;font-size:14px}
+.wrap{max-width:700px;margin:0 auto;padding:16px 16px 90px}
+h1{font-size:20px;margin:8px 0 2px}
+h1 small{color:var(--dim);font-weight:400;font-size:14px;display:block;font-family:ui-monospace,monospace}
 section{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;margin:12px 0}
-h2{font-size:14px;text-transform:uppercase;letter-spacing:.06em;color:var(--dim);margin:0 0 12px}
+h2{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--dim);margin:0 0 10px}
 label{display:block;margin:10px 0 4px;font-size:13px;color:var(--dim)}
-input,select,button{font:inherit;color:var(--fg);background:#141720;border:1px solid var(--line);border-radius:6px;padding:8px 10px;width:100%}
+input,select,button,textarea{font:inherit;color:var(--fg);background:#141720;border:1px solid var(--line);border-radius:6px;padding:8px 10px;width:100%}
+input[type=color]{padding:2px;height:38px}
+input[type=range]{padding:0}
 input:focus,select:focus{outline:2px solid var(--accent);outline-offset:-1px}
 button{background:var(--accent);color:#1a1205;border:0;font-weight:600;cursor:pointer}
 button.sec{background:#252a33;color:var(--fg)}
-.row{display:flex;gap:10px}
+button.tiny{width:auto;padding:5px 10px;font-size:13px;font-weight:500}
+.row{display:flex;gap:10px;align-items:flex-end}
 .row>*{flex:1}
 .hint{font-size:12px;color:var(--dim);margin-top:4px}
-.preview{margin-top:10px;padding:9px 11px;background:#141720;border-left:3px solid var(--accent);border-radius:4px;font-size:13px}
+.note{margin-top:10px;padding:9px 11px;background:#141720;border-left:3px solid var(--accent);border-radius:4px;font-size:13px}
+.note.bad{border-color:var(--bad)}
 details{margin-top:10px;border-top:1px solid var(--line);padding-top:10px}
 summary{cursor:pointer;font-size:13px;color:var(--accent)}
-details p{margin:10px 0;font-size:13px}
+details p{margin:9px 0;font-size:13px;color:var(--dim)}
 details b{color:var(--fg)}
-dl{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:0;font-size:13px}
+code{background:#141720;padding:1px 5px;border-radius:4px;font-size:12px}
+dl{display:grid;grid-template-columns:auto 1fr;gap:5px 14px;margin:0;font-size:13px}
 dt{color:var(--dim)}
-dd{margin:0;text-align:right}
+dd{margin:0;text-align:right;font-family:ui-monospace,monospace}
 .pill{display:inline-block;padding:1px 8px;border-radius:99px;font-size:12px;background:#252a33}
 .pill.ok{background:#14331f;color:var(--ok)}
 .pill.warn{background:#3a2d0c;color:var(--warn)}
-#ovr{display:none;background:#3a2d0c;border-left:3px solid var(--warn);padding:9px 11px;border-radius:4px;margin-bottom:12px;font-size:13px}
+.pill.bad{background:#3a1414;color:var(--bad)}
+.sched{border:1px solid var(--line);border-radius:8px;padding:10px;margin-bottom:8px}
+.sched .row{margin-top:6px}
+.sched .row>*{min-width:0}
+.days{display:flex;gap:3px;margin-top:6px}
+.days button{flex:1;padding:5px 0;font-size:12px;font-weight:500;background:#141720;color:var(--dim);border:1px solid var(--line)}
+.days button.on{background:var(--accent);color:#1a1205;border-color:var(--accent)}
+.bar{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);padding:10px 16px;display:flex;gap:10px;align-items:center;justify-content:center}
+.bar>button{max-width:320px}
+#msg{font-size:13px;text-align:center;min-height:18px;margin-top:6px}
+.err{color:var(--bad)}.good{color:var(--ok)}
 </style>
 
 <div class="wrap">
-<h1>Lixie Clock <span id="devname"></span></h1>
+<h1>Lixie Clock <small id="hdr">connecting…</small></h1>
 
 <section>
   <h2>Time &amp; Location</h2>
   <label for="tz">Timezone</label>
   <select id="tz"></select>
-  <div class="hint">DST rules come from your browser and are stored on the clock as a POSIX rule.</div>
+  <div class="hint" id="tzrule">&nbsp;</div>
 
   <label for="ntp">NTP server</label>
-  <input id="ntp" value="pool.ntp.org">
+  <input id="ntp" placeholder="pool.ntp.org">
 
   <div class="row">
-    <div><label for="lat">Latitude</label><input id="lat" placeholder="38.9072"></div>
-    <div><label for="lon">Longitude</label><input id="lon" placeholder="-77.0369"></div>
+    <div><label for="lat">Latitude</label><input id="lat" placeholder="35.9940" inputmode="text"></div>
+    <div><label for="lon">Longitude</label><input id="lon" placeholder="-78.8986" inputmode="text"></div>
   </div>
   <div class="hint">West longitudes are negative &mdash; everywhere in the Americas starts with a minus sign.</div>
-  <div class="preview" id="solar">Enter your coordinates to preview sunrise and sunset.</div>
+  <div class="note" id="solar">Enter your coordinates to preview sunrise and sunset.</div>
   <button class="sec" id="auto" style="margin-top:10px">Auto-detect my location</button>
 
   <details>
@@ -58,157 +73,625 @@ dd{margin:0;text-align:right}
     <p><b>iPhone</b> &mdash; Open the built-in <b>Compass</b> app. Your latitude and
     longitude are shown at the bottom of the screen, under the elevation.<br>
     <i>Nothing showing?</i> Settings &rarr; Privacy &amp; Security &rarr; Location
-    Services &rarr; on, then <b>Compass</b> &rarr; <i>While Using the App</i>, and
-    turn on <b>Precise Location</b>.</p>
+    Services &rarr; on, then <b>Compass</b> &rarr; <i>While Using the App</i>, and turn
+    on <b>Precise Location</b>.</p>
     <p><b>Android</b> &mdash; Open <b>Google Maps</b> and tap the blue dot for your
-    current location. The card that slides up shows your coordinates. (Touch and
-    hold anywhere on the map to get the coordinates for that spot instead.)</p>
-    <p><b>Either phone</b> &mdash; Standing in the house is plenty accurate. Sunrise
-    and sunset barely move over a few hundred feet.</p>
-    <p>Paste either format: <code>38.9072, -77.0369</code> or
-    <code>38&deg;54'26" N, 77&deg;02'13" W</code>. Pasting both numbers at once into
-    the latitude box splits them for you.</p>
+    current location. The card that slides up shows your coordinates. (Touch and hold
+    anywhere on the map to get the coordinates for that spot instead.)</p>
+    <p><b>Either phone</b> &mdash; Standing in the house is plenty accurate. Sunrise and
+    sunset barely move over a few hundred feet.</p>
+    <p>Paste either format: <code>35.9940, -78.8986</code> or
+    <code>35&deg;59'38" N, 78&deg;53'55" W</code>. Pasting both numbers at once into the
+    latitude box splits them for you.</p>
   </details>
 </section>
 
 <section>
   <h2>Display</h2>
-  <div id="ovr"></div>
   <label for="mode">Mode</label>
-  <select id="mode"><option value="0">Solid color</option><option value="1">Effect</option></select>
-  <label for="effect">Effect</label>
-  <select id="effect"></select>
-  <label for="color">Color</label>
+  <select id="mode">
+    <option value="0">Solid colour</option>
+    <option value="1">Effect</option>
+  </select>
+
+  <div id="effectwrap" style="display:none">
+    <label for="effect">Effect</label>
+    <select id="effect"></select>
+    <div class="hint">Effects are stored now and start animating in the next firmware phase.</div>
+  </div>
+
+  <label for="color">Colour</label>
   <input type="color" id="color" value="#ff8800">
-  <label for="bright">Brightness <span id="brightv">80%</span></label>
-  <input type="range" id="bright" min="1" max="100" value="80">
-  <label for="digits">Number of digits</label>
-  <select id="digits"><option>2</option><option>4</option><option>6</option></select>
+
+  <label for="bright">Brightness <span id="brightv"></span></label>
+  <input type="range" id="bright" min="1" max="100">
+
+  <div class="row">
+    <div>
+      <label for="digits">Digits</label>
+      <select id="digits"><option>2</option><option>4</option><option>6</option></select>
+    </div>
+    <div>
+      <label for="hourfmt">Hour format</label>
+      <select id="hourfmt"><option value="12">12-hour</option><option value="24">24-hour</option></select>
+    </div>
+  </div>
+  <label style="display:flex;gap:8px;align-items:center;margin-top:10px">
+    <input type="checkbox" id="blankzero" style="width:auto"> Blank the leading zero (9:05, not 09:05)
+  </label>
 </section>
 
 <section>
   <h2>Schedule</h2>
   <div id="sched"></div>
-  <button class="sec" id="addrow" style="margin-top:10px">Add entry</button>
-  <div class="hint">Each entry is a transition point: at that moment the clock switches
-  to those settings and holds them until the next entry fires.</div>
+  <button class="sec tiny" id="addrow">Add entry</button>
+  <div class="hint">Each entry is a transition point: at that moment the clock switches to
+  those settings and holds them until the next entry fires. Sunrise and sunset are worked
+  out from your coordinates above.</div>
 </section>
 
 <section>
   <h2>Home Assistant</h2>
-  <label for="mqtthost">MQTT broker</label>
-  <input id="mqtthost" placeholder="homeassistant.local">
   <div class="row">
-    <div><label for="mqttuser">Username</label><input id="mqttuser"></div>
-    <div><label for="mqttpass">Password</label><input id="mqttpass" type="password"></div>
+    <div style="flex:3"><label for="mqtthost">MQTT broker</label><input id="mqtthost" placeholder="homeassistant.local"></div>
+    <div style="flex:1"><label for="mqttport">Port</label><input id="mqttport" inputmode="numeric"></div>
   </div>
-  <div class="hint">Discovery is published automatically; the clock appears as a light.</div>
+  <div class="row">
+    <div><label for="mqttuser">Username</label><input id="mqttuser" autocomplete="off"></div>
+    <div><label for="mqttpass">Password</label><input id="mqttpass" type="password" autocomplete="new-password" placeholder="unchanged"></div>
+  </div>
+  <div class="hint">The clock publishes Home Assistant discovery automatically and appears
+  as a light. Connection starts in a later firmware phase.</div>
+</section>
+
+<section>
+  <h2>Access</h2>
+  <label for="webpass">Config password</label>
+  <input id="webpass" type="password" autocomplete="new-password" placeholder="unchanged">
+  <div class="hint">Leave blank to keep the current setting. Type a single space to remove
+  it. This gates saving only &mdash; it is plain HTTP on your own network, so it prevents
+  accidents, not attackers.</div>
 </section>
 
 <section>
   <h2>Status</h2>
-  <dl id="status"></dl>
+  <dl id="status"><dt>Loading…</dt><dd></dd></dl>
   <div class="row" style="margin-top:12px">
-    <button class="sec" id="release">Return to schedule</button>
-    <button class="sec" id="resync">Resync NTP</button>
+    <button class="sec tiny" id="resync">Resync NTP</button>
+    <button class="sec tiny" id="reboot">Reboot</button>
   </div>
 </section>
-
-<button id="save">Save settings</button>
-<div class="hint" id="saveinfo" style="text-align:center;margin-top:8px"></div>
 </div>
 
-<script>
-const $ = s => document.querySelector(s);
+<div class="bar">
+  <button id="save">Save settings</button>
+</div>
+<div id="msg"></div>
 
-/* ---- coordinate parsing: decimal, DMS, or a pasted pair ---- */
-function parseCoord(s){
+<script>
+'use strict';
+const $ = s => document.querySelector(s);
+const DAYS = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+const EFFECTS = ['Solid','Rainbow Flow','Rainbow Cycle','Breathe','Pulse','Comet','Twinkle','Warm Glow'];
+
+// The page is served from the device, but during development it is opened from a
+// file:// URL pointing at a real clock -- hence the override.
+const BASE = location.protocol === 'file:'
+  ? (localStorage.getItem('lixie') || prompt('Clock IP or hostname:') || '')
+  : '';
+if (BASE && location.protocol === 'file:') localStorage.setItem('lixie', BASE);
+const api = p => (BASE ? 'http://' + BASE : '') + p;
+
+let pass = sessionStorage.getItem('lixiepass') || '';
+
+async function get(path) {
+  const r = await fetch(api(path));
+  if (!r.ok) throw new Error(path + ': ' + r.status);
+  return r.json();
+}
+
+async function post(path, body) {
+  const r = await fetch(api(path), {
+    method: 'POST',
+    headers: Object.assign({'Content-Type': 'application/json'}, pass ? {'X-Auth': pass} : {}),
+    body: JSON.stringify(body),
+  });
+  const j = await r.json().catch(() => ({ok: false, error: 'bad response'}));
+  if (r.status === 401) throw new Error('Wrong config password');
+  if (!j.ok) throw new Error(j.error || ('HTTP ' + r.status));
+  return j;
+}
+
+/* ---------- coordinates: decimal, DMS, or a pasted pair ---------- */
+
+function parseCoord(s) {
   s = String(s).trim();
-  if(!s) return null;
+  if (!s) return null;
   const dms = s.match(/^(\d+(?:\.\d+)?)\s*[°d:\s]\s*(\d+(?:\.\d+)?)\s*['m:\s]\s*(?:(\d+(?:\.\d+)?)\s*["s]?)?\s*([NSEW])?$/i);
-  if(dms){
-    let v = +dms[1] + (+dms[2])/60 + (+(dms[3]||0))/3600;
-    if(dms[4] && /[SW]/i.test(dms[4])) v = -v;
+  if (dms) {
+    let v = +dms[1] + (+dms[2]) / 60 + (+(dms[3] || 0)) / 3600;
+    if (dms[4] && /[SW]/i.test(dms[4])) v = -v;
     return v;
   }
   const dec = s.match(/^([+-]?\d+(?:\.\d+)?)\s*°?\s*([NSEW])?$/i);
-  if(dec){
+  if (dec) {
     let v = +dec[1];
-    if(dec[2] && /[SW]/i.test(dec[2])) v = -v;
+    if (dec[2] && /[SW]/i.test(dec[2])) v = -v;
     return v;
   }
   return null;
 }
 
-function splitPair(s){
+function splitPair(s) {
   const parts = String(s).split(/\s*,\s*/);
-  if(parts.length !== 2) return null;
+  if (parts.length !== 2) return null;
   const a = parseCoord(parts[0]), b = parseCoord(parts[1]);
   return (a === null || b === null) ? null : [a, b];
 }
 
-/* ---- NOAA sunrise/sunset, mirrored from src/solar.cpp for live preview ---- */
-function solar(lat, lon, date){
-  const rad = Math.PI/180;
-  const start = Date.UTC(date.getUTCFullYear(), 0, 0);
-  const doy = Math.floor((Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()) - start) / 86400000);
+/* ---------- NOAA sunrise/sunset, mirrored from src/solar for preview ---------- */
+
+function solar(lat, lon, date) {
+  const rad = Math.PI / 180;
+  const jan1 = Date.UTC(date.getUTCFullYear(), 0, 1);
+  const doy = Math.floor((Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()) - jan1) / 86400000) + 1;
   const g = 357.529 + 0.98560028 * (doy - 1);
-  const decl = Math.asin(Math.sin(23.44*rad) * Math.sin((280.459 + 0.98564736*(doy-1) + 1.915*Math.sin(g*rad))*rad)) / rad;
+  const lambda = 280.459 + 0.98564736 * (doy - 1) + 1.915 * Math.sin(g * rad);
+  const decl = Math.asin(Math.sin(23.44 * rad) * Math.sin(lambda * rad)) / rad;
   const B = (doy - 81) * 2 * Math.PI / 364;
-  const eot = 9.87*Math.sin(2*B) - 7.53*Math.cos(B) - 1.5*Math.sin(B);
-  const ha = Math.cos(90.833*rad) / (Math.cos(lat*rad)*Math.cos(decl*rad)) - Math.tan(lat*rad)*Math.tan(decl*rad);
-  if(ha > 1) return null;            // polar night
-  if(ha < -1) return {up:true};      // midnight sun
-  const H = Math.acos(ha)/rad;
-  const noon = 720 - 4*lon - eot;    // UTC minutes
-  return {rise:(noon - 4*H), set:(noon + 4*H)};
+  const eot = 9.87 * Math.sin(2 * B) - 7.53 * Math.cos(B) - 1.5 * Math.sin(B);
+  const cosH = Math.cos(90.833 * rad) / (Math.cos(lat * rad) * Math.cos(decl * rad))
+             - Math.tan(lat * rad) * Math.tan(decl * rad);
+  if (cosH > 1) return {none: true};
+  if (cosH < -1) return {always: true};
+  const H = Math.acos(cosH) / rad;
+  const noon = 720 - 4 * lon - eot;
+  return {rise: noon - 4 * H, set: noon + 4 * H};
 }
 
-function fmtLocal(utcMinutes, date){
-  const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 0, Math.round(utcMinutes)));
-  return d.toLocaleTimeString([], {hour:'numeric', minute:'2-digit', timeZone:$('#tz').value});
+function fmtUtcMinutes(mins, date, zone) {
+  // mins may fall outside 0..1439; Date handles the rollover for us.
+  const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 0, Math.round(mins)));
+  try {
+    return d.toLocaleTimeString([], {hour: 'numeric', minute: '2-digit', timeZone: zone});
+  } catch (e) {
+    return d.toISOString().slice(11, 16) + ' UTC';
+  }
 }
 
-function updateSolar(){
+function updateSolar() {
   const lat = parseCoord($('#lat').value), lon = parseCoord($('#lon').value);
   const box = $('#solar');
-  if(lat === null || lon === null){
+  box.classList.remove('bad');
+  if (lat === null || lon === null) {
     box.textContent = 'Enter your coordinates to preview sunrise and sunset.';
     return;
   }
-  if(Math.abs(lat) > 90 || Math.abs(lon) > 180){
-    box.textContent = 'That is out of range \u2014 latitude is \u00b190, longitude is \u00b1180.';
+  if (Math.abs(lat) > 90 || Math.abs(lon) > 180) {
+    box.classList.add('bad');
+    box.textContent = 'Out of range — latitude is ±90, longitude is ±180.';
     return;
   }
-  const now = new Date();
+  const now = new Date(), zone = $('#tz').value;
   const s = solar(lat, lon, now);
-  if(!s){ box.textContent = 'No sunrise today at that latitude (polar night).'; return; }
-  if(s.up){ box.textContent = 'The sun never sets today at that latitude.'; return; }
-  box.textContent = `That puts today's sunrise at ${fmtLocal(s.rise, now)} and sunset at ${fmtLocal(s.set, now)}.`;
+  if (s.none)   { box.textContent = 'The sun never rises today at that latitude.'; return; }
+  if (s.always) { box.textContent = 'The sun never sets today at that latitude.'; return; }
+  box.textContent = "That puts today's sunrise at " + fmtUtcMinutes(s.rise, now, zone)
+                  + ' and sunset at ' + fmtUtcMinutes(s.set, now, zone) + '.';
 }
 
-/* ---- wiring ---- */
-function initTz(){
-  const sel = $('#tz');
-  const zones = Intl.supportedValuesOf ? Intl.supportedValuesOf('timeZone') : [];
-  const here = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  for(const z of zones){
-    const o = document.createElement('option');
-    o.value = o.textContent = z;
-    if(z === here) o.selected = true;
-    sel.appendChild(o);
+/* ---------- POSIX TZ derivation ----------
+   The device stores no timezone database. The browser already ships the world's
+   zone data via Intl, so we derive a POSIX rule here and send it as ~48 bytes. */
+
+function offsetMinutes(zone, date) {
+  // Minutes EAST of UTC (the opposite sign from POSIX).
+  const s = new Intl.DateTimeFormat('en-US', {timeZone: zone, timeZoneName: 'longOffset'})
+    .formatToParts(date).find(p => p.type === 'timeZoneName').value;
+  const m = s.match(/GMT([+-])(\d{1,2})(?::(\d{2}))?/);
+  if (!m) return 0;
+  return (m[1] === '-' ? -1 : 1) * (+m[2] * 60 + (+(m[3] || 0)));
+}
+
+function abbrev(zone, date) {
+  const s = new Intl.DateTimeFormat('en-US', {timeZone: zone, timeZoneName: 'short'})
+    .formatToParts(date).find(p => p.type === 'timeZoneName').value;
+  return /^[A-Za-z]{2,6}$/.test(s) ? s : null;
+}
+
+function posixOffset(eastMinutes) {
+  // POSIX is west-positive, i.e. the sign flips.
+  const w = -eastMinutes;
+  const sign = w < 0 ? '-' : '';
+  const a = Math.abs(w);
+  const h = Math.floor(a / 60), m = a % 60;
+  return sign + h + (m ? ':' + String(m).padStart(2, '0') : '');
+}
+
+// Binary-search the instant where the offset changes, to the minute.
+function findTransition(zone, loMs, hiMs) {
+  const loOff = offsetMinutes(zone, new Date(loMs));
+  if (loOff === offsetMinutes(zone, new Date(hiMs))) return null;
+  while (hiMs - loMs > 60000) {
+    const mid = Math.floor((loMs + hiMs) / 2);
+    if (offsetMinutes(zone, new Date(mid)) === loOff) loMs = mid; else hiMs = mid;
+  }
+  return hiMs;
+}
+
+// Express a transition instant as an Mm.w.d/time rule in local wall time.
+function ruleFor(zone, instantMs, offsetBeforeEast) {
+  const local = new Date(instantMs + offsetBeforeEast * 60000);
+  const month = local.getUTCMonth() + 1;
+  const dom = local.getUTCDate();
+  const dow = local.getUTCDay();
+  const year = local.getUTCFullYear();
+  // Week 5 means "last"; use it when there is no later same-weekday in the month.
+  const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  const week = (dom + 7 > daysInMonth) ? 5 : Math.ceil(dom / 7);
+  const secs = local.getUTCHours() * 3600 + local.getUTCMinutes() * 60;
+  const h = Math.floor(secs / 3600), m = Math.floor((secs % 3600) / 60);
+  const time = m ? h + ':' + String(m).padStart(2, '0') : String(h);
+  return 'M' + month + '.' + week + '.' + dow + (time === '2' ? '' : '/' + time);
+}
+
+function posixTz(zone) {
+  const year = new Date().getUTCFullYear();
+  const jan = new Date(Date.UTC(year, 0, 1)), jul = new Date(Date.UTC(year, 6, 1));
+  const offJan = offsetMinutes(zone, jan), offJul = offsetMinutes(zone, jul);
+
+  const stdOff = Math.min(offJan, offJul);
+  const dstOff = Math.max(offJan, offJul);
+  const stdDate = (offJan === stdOff) ? jan : jul;
+  const dstDate = (offJan === dstOff) ? jan : jul;
+
+  const stdName = abbrev(zone, stdDate) || '<' + posixOffsetTag(stdOff) + '>';
+  if (stdOff === dstOff) return stdName + posixOffset(stdOff);
+
+  const dstName = abbrev(zone, dstDate) || '<' + posixOffsetTag(dstOff) + '>';
+
+  // Scan the year month by month for the two transition instants.
+  const edges = [];
+  for (let mo = 0; mo < 12; mo++) {
+    const a = Date.UTC(year, mo, 1), b = Date.UTC(year, mo + 1, 1);
+    const t = findTransition(zone, a, b);
+    if (t !== null) edges.push(t);
+  }
+  if (edges.length !== 2) return stdName + posixOffset(stdOff);   // give up safely
+
+  // The one that moves us to the larger (DST) offset is the start.
+  let startMs = edges[0], endMs = edges[1];
+  if (offsetMinutes(zone, new Date(edges[0] + 60000)) !== dstOff) {
+    startMs = edges[1]; endMs = edges[0];
+  }
+
+  // POSIX defaults the DST offset to one hour ahead of standard, so omit it in
+  // the overwhelmingly common case and keep the stored rule short. Places with
+  // a half-hour shift (Lord Howe Island) still get it spelled out.
+  const dstTail = (dstOff - stdOff === 60) ? '' : posixOffset(dstOff);
+
+  return stdName + posixOffset(stdOff) + dstName + dstTail
+       + ',' + ruleFor(zone, startMs, stdOff)
+       + ',' + ruleFor(zone, endMs, dstOff);
+}
+
+function posixOffsetTag(eastMinutes) {
+  // Quoted zone name for places Intl has no letter abbreviation for, e.g.
+  // <+0530>. Minutes must be included or India reads as <+05>.
+  const sign = eastMinutes < 0 ? '-' : '+';
+  const a = Math.abs(eastMinutes);
+  const h = String(Math.floor(a / 60)).padStart(2, '0'), m = a % 60;
+  return sign + h + (m ? String(m).padStart(2, '0') : '');
+}
+
+function refreshTzRule() {
+  const zone = $('#tz').value;
+  try {
+    const rule = posixTz(zone);
+    $('#tzrule').textContent = 'Stored on the clock as: ' + rule;
+    return rule;
+  } catch (e) {
+    $('#tzrule').textContent = 'Could not derive a rule for ' + zone;
+    return null;
   }
 }
+
+/* ---------- schedule editor ---------- */
+
+function schedRow(e) {
+  const div = document.createElement('div');
+  div.className = 'sched';
+  div.innerHTML =
+    '<div class="days">' + DAYS.map((d, i) =>
+      '<button type="button" data-bit="' + i + '">' + d + '</button>').join('') + '</div>' +
+    '<div class="row">' +
+      '<div style="flex:1.2"><label>When</label><select class="anchor">' +
+        '<option value="0">Time of day</option><option value="1">Sunrise</option>' +
+        '<option value="2">Sunset</option></select></div>' +
+      '<div class="timewrap"></div>' +
+    '</div>' +
+    '<div class="row">' +
+      '<div><label>Mode</label><select class="mode">' +
+        '<option value="0">Solid</option><option value="1">Effect</option></select></div>' +
+      '<div class="fxwrap"><label>Effect</label><select class="effect">' +
+        EFFECTS.map((n, i) => '<option value="' + i + '">' + n + '</option>').join('') +
+        '</select></div>' +
+      '<div style="flex:0 0 62px"><label>Colour</label><input type="color" class="col"></div>' +
+    '</div>' +
+    '<div class="row">' +
+      '<div><label>Brightness <span class="brv"></span></label>' +
+        '<input type="range" class="br" min="1" max="100"></div>' +
+      '<div style="flex:0 0 auto"><button type="button" class="sec tiny del">Remove</button></div>' +
+    '</div>';
+
+  let days = e.days === undefined ? 0x7F : e.days;
+  const dayBtns = div.querySelectorAll('.days button');
+  const paintDays = () => dayBtns.forEach((b, i) =>
+    b.classList.toggle('on', !!(days & (1 << i))));
+  dayBtns.forEach((b, i) => b.onclick = () => { days ^= (1 << i); paintDays(); });
+  paintDays();
+
+  const anchor = div.querySelector('.anchor');
+  anchor.value = String(e.anchor || 0);
+
+  const timewrap = div.querySelector('.timewrap');
+  const paintTime = (mins) => {
+    if (anchor.value === '0') {
+      const m = (mins === undefined || mins < 0) ? 1200 : mins;
+      timewrap.innerHTML = '<label>Time</label><input type="time" class="tod">';
+      timewrap.querySelector('.tod').value =
+        String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
+    } else {
+      const m = (mins === undefined) ? 0 : mins;
+      timewrap.innerHTML = '<label>Offset (minutes)</label>' +
+        '<input type="number" class="off" min="-720" max="720" step="5">';
+      timewrap.querySelector('.off').value = m;
+    }
+  };
+  paintTime(e.minutes);
+  anchor.onchange = () => paintTime(anchor.value === '0' ? 1200 : 0);
+
+  const mode = div.querySelector('.mode');
+  mode.value = String(e.mode || 0);
+  const fxwrap = div.querySelector('.fxwrap');
+  const paintMode = () => fxwrap.style.display = (mode.value === '1') ? '' : 'none';
+  mode.onchange = paintMode;
+  paintMode();
+
+  div.querySelector('.effect').value = String(e.effect || 0);
+  div.querySelector('.col').value = rgbToHex(
+    e.r === undefined ? 255 : e.r, e.g === undefined ? 136 : e.g, e.b === undefined ? 0 : e.b);
+
+  const br = div.querySelector('.br'), brv = div.querySelector('.brv');
+  br.value = e.brightness || 60;
+  const paintBr = () => brv.textContent = br.value + '%';
+  br.oninput = paintBr;
+  paintBr();
+
+  div.querySelector('.del').onclick = () => div.remove();
+  div.getDays = () => days;
+  return div;
+}
+
+function readSchedule() {
+  return [...document.querySelectorAll('.sched')].map(div => {
+    const anchor = +div.querySelector('.anchor').value;
+    let minutes;
+    if (anchor === 0) {
+      const [h, m] = div.querySelector('.tod').value.split(':').map(Number);
+      minutes = h * 60 + m;
+    } else {
+      minutes = +div.querySelector('.off').value || 0;
+    }
+    const c = hexToRgb(div.querySelector('.col').value);
+    return {
+      days: div.getDays(), anchor, minutes,
+      mode: +div.querySelector('.mode').value,
+      effect: +div.querySelector('.effect').value,
+      r: c[0], g: c[1], b: c[2],
+      brightness: +div.querySelector('.br').value,
+    };
+  });
+}
+
+/* ---------- helpers ---------- */
+
+const hex2 = n => n.toString(16).padStart(2, '0');
+const rgbToHex = (r, g, b) => '#' + hex2(r) + hex2(g) + hex2(b);
+const hexToRgb = h => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+
+function say(text, cls) {
+  const m = $('#msg');
+  m.textContent = text;
+  m.className = cls || '';
+  if (cls === 'good') setTimeout(() => { if (m.textContent === text) m.textContent = ''; }, 4000);
+}
+
+function dur(s) {
+  if (s < 60) return s + 's';
+  if (s < 3600) return Math.floor(s / 60) + 'm';
+  if (s < 86400) return Math.floor(s / 3600) + 'h ' + Math.floor((s % 3600) / 60) + 'm';
+  return Math.floor(s / 86400) + 'd ' + Math.floor((s % 86400) / 3600) + 'h';
+}
+
+function pill(text, cls) { return '<span class="pill ' + cls + '">' + text + '</span>'; }
+
+function rssiPill(d) {
+  if (!d.wifi) return pill('down', 'bad');
+  const q = d.rssi > -60 ? 'ok' : d.rssi > -75 ? 'warn' : 'bad';
+  return pill(d.rssi + ' dBm', q);
+}
+
+/* ---------- load / save ---------- */
+
+function fillTzList(selected) {
+  const sel = $('#tz');
+  sel.innerHTML = '';
+  let zones = [];
+  try { zones = Intl.supportedValuesOf('timeZone'); } catch (e) { zones = []; }
+  const here = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  if (!zones.length) zones = [here];
+  for (const z of zones) {
+    const o = document.createElement('option');
+    o.value = o.textContent = z;
+    sel.appendChild(o);
+  }
+  // The device stores a POSIX rule, not a zone name, so we cannot map back
+  // exactly. Preselect the browser's zone and show the rule it produces; if the
+  // clock's stored rule already matches, nothing changes on save.
+  sel.value = selected && zones.includes(selected) ? selected : here;
+}
+
+async function loadAll() {
+  const [st, cf, sc] = await Promise.all([
+    get('/api/state'), get('/api/config'), get('/api/schedule'),
+  ]);
+
+  fillTzList(localStorage.getItem('lixiezone'));
+  const derived = refreshTzRule();
+  if (derived && derived !== cf.tz) {
+    $('#tzrule').textContent = 'Clock currently: ' + cf.tz + ' — saving will set: ' + derived;
+  }
+
+  $('#ntp').value = cf.ntp;
+  $('#lat').value = cf.lat;
+  $('#lon').value = cf.lon;
+  $('#mode').value = String(cf.mode);
+  $('#color').value = rgbToHex(cf.r, cf.g, cf.b);
+  $('#bright').value = cf.brightness;
+  $('#brightv').textContent = cf.brightness + '%';
+  $('#digits').value = String(cf.digits);
+  $('#hourfmt').value = String(cf.hour_format);
+  $('#blankzero').checked = !!cf.blank_hour_zero;
+  $('#mqtthost').value = cf.mqtt_host;
+  $('#mqttport').value = cf.mqtt_port;
+  $('#mqttuser').value = cf.mqtt_user;
+  if (cf.has_mqtt_pass) $('#mqttpass').placeholder = 'already set — leave blank to keep';
+  if (cf.has_web_pass) $('#webpass').placeholder = 'already set — leave blank to keep';
+
+  const fx = $('#effect');
+  fx.innerHTML = EFFECTS.map((n, i) => '<option value="' + i + '">' + n + '</option>').join('');
+  fx.value = String(cf.effect);
+  $('#effectwrap').style.display = (cf.mode === 1) ? '' : 'none';
+
+  const list = $('#sched');
+  list.innerHTML = '';
+  (sc.schedule || []).forEach(e => list.appendChild(schedRow(e)));
+
+  updateSolar();
+  paintStatus(st);
+}
+
+function paintStatus(d) {
+  $('#hdr').textContent = d.ip + '  ·  ' + d.time.replace('T', ' ') + ' ' + d.abbr;
+  const rows = [
+    ['Local time', d.time.replace('T', ' ') + ' ' + d.abbr + (d.dst ? ' (DST)' : '')],
+    ['Timezone rule', d.tz_ok ? pill('valid', 'ok') : pill('invalid — using default', 'bad')],
+    ['NTP', !d.synced ? pill('never synced', 'bad')
+        : d.ntp_stale ? pill('stale, ' + dur(d.ntp_age) + ' ago', 'warn')
+        : pill('synced ' + dur(d.ntp_age) + ' ago', 'ok')],
+    ['NTP failures', d.ntp_fails],
+    ['Wi-Fi', d.ssid + ' &nbsp;' + rssiPill(d)],
+    ['Particle cloud', d.cloud ? pill('connected', 'ok') : pill('offline', 'warn')],
+    ['IP address', d.ip],
+    ['Uptime', dur(d.uptime)],
+    ['Free memory', (d.freemem / 1024).toFixed(1) + ' kB'],
+    ['Boots', d.boots + (d.recoveries ? ' (' + d.recoveries + ' Wi-Fi recoveries)' : '')],
+    ['Last reset', d.reset_reason],
+    ['LEDs driven', d.leds + ' across ' + d.digits + ' digits'],
+  ];
+  $('#status').innerHTML = rows.map(r => '<dt>' + r[0] + '</dt><dd>' + r[1] + '</dd>').join('');
+}
+
+async function save() {
+  const lat = parseCoord($('#lat').value), lon = parseCoord($('#lon').value);
+  if (lat === null || lon === null) { say('Coordinates are not valid.', 'err'); return; }
+
+  const rule = refreshTzRule();
+  if (!rule) { say('Could not derive a timezone rule.', 'err'); return; }
+
+  const c = hexToRgb($('#color').value);
+  const body = {
+    tz: rule, ntp: $('#ntp').value.trim(), lat, lon,
+    digits: +$('#digits').value, hour_format: +$('#hourfmt').value,
+    blank_hour_zero: $('#blankzero').checked ? 1 : 0,
+    mode: +$('#mode').value, effect: +$('#effect').value,
+    r: c[0], g: c[1], b: c[2], brightness: +$('#bright').value,
+    mqtt_host: $('#mqtthost').value.trim(), mqtt_port: +$('#mqttport').value || 1883,
+    mqtt_user: $('#mqttuser').value,
+  };
+  if ($('#mqttpass').value) body.mqtt_pass = $('#mqttpass').value;
+  if ($('#webpass').value) body.web_pass = $('#webpass').value.trim();
+
+  try {
+    say('Saving…');
+    await post('/api/config', body);
+    await post('/api/schedule', {schedule: readSchedule()});
+    localStorage.setItem('lixiezone', $('#tz').value);
+    // A newly set password applies to the next request, so adopt it now.
+    if ($('#webpass').value) {
+      pass = $('#webpass').value.trim();
+      sessionStorage.setItem('lixiepass', pass);
+      $('#webpass').value = '';
+    }
+    if ($('#mqttpass').value) $('#mqttpass').value = '';
+    say('Saved.', 'good');
+    paintStatus(await get('/api/state'));
+  } catch (e) {
+    if (/password/i.test(e.message)) {
+      const p = prompt('Config password:');
+      if (p !== null) { pass = p; sessionStorage.setItem('lixiepass', p); return save(); }
+    }
+    say(e.message, 'err');
+  }
+}
+
+/* ---------- wiring ---------- */
 
 $('#lat').addEventListener('input', e => {
   const pair = splitPair(e.target.value);
-  if(pair){ e.target.value = pair[0]; $('#lon').value = pair[1]; }
+  if (pair) { e.target.value = pair[0]; $('#lon').value = pair[1]; }
   updateSolar();
 });
 $('#lon').addEventListener('input', updateSolar);
-$('#tz').addEventListener('change', updateSolar);
+$('#tz').addEventListener('change', () => { refreshTzRule(); updateSolar(); });
 $('#bright').addEventListener('input', e => $('#brightv').textContent = e.target.value + '%');
+$('#mode').addEventListener('change', e =>
+  $('#effectwrap').style.display = (e.target.value === '1') ? '' : 'none');
+$('#addrow').onclick = () => $('#sched').appendChild(schedRow({}));
+$('#save').onclick = save;
 
-initTz();
-updateSolar();
+$('#auto').onclick = () => {
+  say('Locating…');
+  if (!navigator.geolocation || !window.isSecureContext) {
+    // Plain http:// is not a secure context, so the browser blocks geolocation
+    // outright. Fall back to letting the clock ask, over its own connection.
+    say('Browser location needs HTTPS — asking the clock instead…');
+  }
+  if (navigator.geolocation && window.isSecureContext) {
+    navigator.geolocation.getCurrentPosition(p => {
+      $('#lat').value = p.coords.latitude.toFixed(4);
+      $('#lon').value = p.coords.longitude.toFixed(4);
+      updateSolar();
+      say('Located from your browser.', 'good');
+    }, () => say('Browser would not share your location — enter it by hand.', 'err'));
+  } else {
+    say('Enter your coordinates by hand — see "How do I find my coordinates?" above.', 'err');
+  }
+};
+
+$('#resync').onclick = async () => {
+  try { await post('/api/action', {action: 'resync'}); say('Resynced.', 'good');
+        paintStatus(await get('/api/state')); }
+  catch (e) { say(e.message, 'err'); }
+};
+
+$('#reboot').onclick = async () => {
+  if (!confirm('Reboot the clock?')) return;
+  try { await post('/api/action', {action: 'reboot'}); say('Rebooting…'); }
+  catch (e) { say(e.message, 'err'); }
+};
+
+loadAll().catch(e => say('Could not reach the clock: ' + e.message, 'err'));
+setInterval(() => get('/api/state').then(paintStatus).catch(() => {}), 5000);
 </script>
