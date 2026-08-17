@@ -15,9 +15,11 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 SRC = ROOT / "web" / "index.html"
 DST = ROOT / "src" / "web_assets.h"
 
-# Flash budget guard. The page is only one line item in a 128 KB image; if it
-# creeps past this, something needs to shrink before the build gets tight.
-MAX_GZIP_BYTES = 14 * 1024
+# Flash budget guard. Raised from 14 KB once Phase 0 showed the real image was
+# less than half the estimate -- with ~55 KB of flash still free, 14 KB was
+# tighter than anything justified. Still a guard, not a target: if the page
+# doubles again, that is worth noticing rather than silently absorbing.
+MAX_GZIP_BYTES = 20 * 1024
 
 
 def main() -> int:

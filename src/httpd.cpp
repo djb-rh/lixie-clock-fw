@@ -170,7 +170,7 @@ void serveState(TCPClient &c) {
         "{"
         "\"time\":\"%04d-%02d-%02dT%02d:%02d:%02d\",\"abbr\":\"%s\",\"dst\":%s,"
         "\"synced\":%s,\"ntp_age\":%lu,\"ntp_stale\":%s,\"ntp_fails\":%lu,"
-        "\"tz_ok\":%s,\"std_off\":%ld,\"dst_off\":%ld,"
+        "\"tz_ok\":%s,\"std_off\":%ld,\"dst_off\":%ld,\"observe_dst\":%s,"
         "\"wifi\":%s,\"cloud\":%s,\"rssi\":%d,\"ip\":\"%s\",\"ssid\":\"%s\","
         "\"uptime\":%lu,\"freemem\":%lu,\"boots\":%lu,\"recoveries\":%lu,"
         "\"reset_reason\":\"%s\",\"requests\":%lu,"
@@ -195,6 +195,7 @@ void serveState(TCPClient &c) {
         (unsigned long)Timekeep::failedSyncs(),
         Timekeep::tzValid() ? "true" : "false",
         (long)tz.std_off, (long)(tz.has_dst ? tz.dst_off : tz.std_off),
+        cfg.observe_dst ? "true" : "false",
         NetWatch::wifiUp() ? "true" : "false",
         NetWatch::cloudUp() ? "true" : "false",
         NetWatch::rssi(), WiFi.localIP().toString().c_str(), WiFi.SSID(),
@@ -250,11 +251,12 @@ void serveConfig(TCPClient &c) {
 
     app(o, "\"tz\":\"%s\",\"ntp\":\"%s\",\"lat\":%.4f,\"lon\":%.4f,"
         "\"digits\":%u,\"hour_format\":%u,\"blank_hour_zero\":%u,"
+        "\"observe_dst\":%u,"
         "\"mode\":%u,\"effect\":%u,\"r\":%u,\"g\":%u,\"b\":%u,\"brightness\":%u,"
         "\"mqtt_host\":\"%s\",\"mqtt_port\":%u,\"mqtt_user\":\"%s\","
         "\"has_mqtt_pass\":%s,\"has_web_pass\":%s}",
         cfg.tz, cfg.ntp_server, (double)cfg.lat, (double)cfg.lon,
-        cfg.digits, cfg.hour_format, cfg.blank_hour_zero,
+        cfg.digits, cfg.hour_format, cfg.blank_hour_zero, cfg.observe_dst,
         cfg.mode, cfg.effect, cfg.r, cfg.g, cfg.b, cfg.brightness,
         cfg.mqtt_host, cfg.mqtt_port, cfg.mqtt_user,
         cfg.mqtt_pass[0] ? "true" : "false",
@@ -325,6 +327,12 @@ bool applyConfig(const char *body, size_t len, char *err, size_t errn) {
     }
     if (jsonGetInt(body, len, "blank_hour_zero", v)) {
         cfg.blank_hour_zero = v ? 1 : 0;
+        applied++;
+    }
+    if (jsonGetInt(body, len, "observe_dst", v)) {
+        cfg.observe_dst = v ? 1 : 0;
+        // Re-parse so the change takes effect now rather than at next boot.
+        Timekeep::setTz(cfg.tz);
         applied++;
     }
     if (jsonGetInt(body, len, "mode", v)) {

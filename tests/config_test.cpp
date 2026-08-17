@@ -85,6 +85,68 @@ int main() {
     check(crc16((const uint8_t *)&g, CONFIG_CRC_LEN) == g.crc,
           "untouched copy still validates");
 
+    printf("\n--- v1 -> v2 migration ---\n");
+    // A firmware update must not cost somebody their timezone, location and
+    // broker password, which is what a plain CRC-mismatch reset would do.
+    ConfigV1 v1;
+    memset(&v1, 0, sizeof(v1));
+    v1.version = 1;
+    v1.digits = 6;
+    v1.hour_format = 24;
+    v1.blank_hour_zero = 0;
+    strcpy(v1.tz, "AEST-10AEDT,M10.1.0,M4.1.0/3");
+    strcpy(v1.ntp_server, "time.nist.gov");
+    v1.lat = -33.8688f; v1.lon = 151.2093f;
+    strcpy(v1.mqtt_host, "10.0.0.18");
+    v1.mqtt_port = 1883;
+    strcpy(v1.mqtt_user, "mqtt");
+    strcpy(v1.mqtt_pass, "a-secret-worth-keeping");
+    strcpy(v1.web_pass, "hunter2");
+    v1.mode = 1; v1.effect = 5;
+    v1.r = 12; v1.g = 34; v1.b = 56;
+    v1.brightness = 77;
+    v1.schedule[0].enabled = 1;
+    v1.schedule[0].days_mask = 0x7F;
+    v1.schedule[0].anchor = ANCHOR_SUNSET;
+    v1.schedule[0].minutes = -45;
+    v1.schedule[0].brightness = 15;
+    v1.crc = crc16((const uint8_t *)&v1, CONFIG_V1_CRC_LEN);
+
+    Config up;
+    check(configMigrateV1(v1, up), "a valid v1 record migrates");
+    check(up.version == CFG_VERSION, "version bumped to current");
+    check(!strcmp(up.tz, "AEST-10AEDT,M10.1.0,M4.1.0/3"), "timezone preserved");
+    check(!strcmp(up.mqtt_pass, "a-secret-worth-keeping"), "broker password preserved");
+    check(!strcmp(up.web_pass, "hunter2"), "config password preserved");
+    check(up.lat < -33.8f && up.lon > 151.0f, "location preserved");
+    check(up.digits == 6 && up.hour_format == 24 && up.brightness == 77,
+          "display settings preserved");
+    check(up.effect == 5 && up.mode == 1, "effect preserved");
+    check(up.schedule[0].enabled == 1 && up.schedule[0].anchor == ANCHOR_SUNSET &&
+          up.schedule[0].minutes == -45, "schedule preserved");
+    check(up.observe_dst == 1, "DST defaults to on, matching v1 behaviour");
+
+    // And the migrated record must itself round-trip under the v2 CRC.
+    up.crc = crc16((const uint8_t *)&up, CONFIG_CRC_LEN);
+    Config again = up;
+    check(crc16((const uint8_t *)&again, CONFIG_CRC_LEN) == again.crc,
+          "migrated record validates under the v2 CRC");
+
+    ConfigV1 corrupt = v1;
+    corrupt.lat = 0.0f;                      // CRC no longer matches
+    Config nope;
+    check(!configMigrateV1(corrupt, nope), "a corrupt v1 record is rejected, not migrated");
+
+    ConfigV1 wrongver = v1;
+    wrongver.version = 7;
+    wrongver.crc = crc16((const uint8_t *)&wrongver, CONFIG_V1_CRC_LEN);
+    check(!configMigrateV1(wrongver, nope), "an unknown version is rejected");
+
+    printf("\n--- reserved space ---\n");
+    snprintf(buf, sizeof(buf), "%zu reserved bytes for future fields, no migration needed",
+             sizeof(up.reserved));
+    check(sizeof(up.reserved) >= 8, buf);
+
     printf("\n--- schedule capacity ---\n");
     snprintf(buf, sizeof(buf), "%u entries x %zu bytes = %zu bytes of schedule",
              MAX_SCHEDULE, sizeof(ScheduleEntry),

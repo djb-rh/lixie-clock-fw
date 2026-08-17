@@ -17,24 +17,43 @@ void configDefaults() {
     cfg.mode = MODE_SOLID;
     cfg.r = 255; cfg.g = 136; cfg.b = 0;
     cfg.brightness = 60;
+    cfg.observe_dst = 1;
+}
+
+static void clampLoaded() {
+    if (cfg.digits < 2 || cfg.digits > MAX_DIGITS) cfg.digits = 4;
+    if (cfg.brightness < 1 || cfg.brightness > 100) cfg.brightness = 60;
+    if (cfg.hour_format != 12 && cfg.hour_format != 24) cfg.hour_format = 12;
+    if (cfg.mqtt_port == 0) cfg.mqtt_port = 1883;
+    if (cfg.observe_dst > 1) cfg.observe_dst = 1;
+    cfg.tz[sizeof(cfg.tz) - 1] = 0;
+    cfg.ntp_server[sizeof(cfg.ntp_server) - 1] = 0;
 }
 
 bool configLoad() {
     EEPROM.get(0, cfg);
     uint16_t want = crc16((const uint8_t *)&cfg, CONFIG_CRC_LEN);
-    if (cfg.version != CFG_VERSION || cfg.crc != want) {
-        configDefaults();
-        return false;
+
+    if (cfg.version == CFG_VERSION && cfg.crc == want) {
+        clampLoaded();
+        return true;
     }
 
-    // Defend against a valid-CRC struct that would still render nothing.
-    if (cfg.digits < 2 || cfg.digits > MAX_DIGITS) cfg.digits = 4;
-    if (cfg.brightness < 1 || cfg.brightness > 100) cfg.brightness = 60;
-    if (cfg.hour_format != 12 && cfg.hour_format != 24) cfg.hour_format = 12;
-    if (cfg.mqtt_port == 0) cfg.mqtt_port = 1883;
-    cfg.tz[sizeof(cfg.tz) - 1] = 0;
-    cfg.ntp_server[sizeof(cfg.ntp_server) - 1] = 0;
-    return true;
+    // Not a current record. Before giving up and resetting everything, see
+    // whether it is a valid older one -- a firmware update should not cost
+    // somebody their timezone, location and broker password.
+    ConfigV1 old;
+    EEPROM.get(0, old);
+    Config migrated;
+    if (configMigrateV1(old, migrated)) {
+        cfg = migrated;
+        clampLoaded();
+        configSave();
+        return true;
+    }
+
+    configDefaults();
+    return false;
 }
 
 void configSave() {

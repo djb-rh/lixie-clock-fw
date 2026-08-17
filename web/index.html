@@ -58,6 +58,11 @@ dd{margin:0;text-align:right;font-family:ui-monospace,monospace}
   <label for="tz">Timezone</label>
   <select id="tz"></select>
   <div class="hint" id="tzrule">&nbsp;</div>
+  <label style="display:flex;gap:8px;align-items:center;margin-top:10px">
+    <input type="checkbox" id="dst" style="width:auto"> Observe daylight saving time
+  </label>
+  <div class="hint">Off keeps the clock on standard time all year. The full rule stays
+  stored either way, so turning this back on needs no re-selection.</div>
 
   <label for="ntp">NTP server</label>
   <input id="ntp" placeholder="pool.ntp.org">
@@ -103,7 +108,7 @@ dd{margin:0;text-align:right;font-family:ui-monospace,monospace}
     <div class="hint">Rainbow effects set their own colours; the others tint and modulate the colour below.</div>
   </div>
 
-  <label for="color">Colour</label>
+  <label for="color">Colour <span id="colorname" style="color:var(--fg)"></span></label>
   <input type="color" id="color" value="#ff8800">
 
   <label for="bright">Brightness <span id="brightv"></span></label>
@@ -163,6 +168,18 @@ dd{margin:0;text-align:right;font-family:ui-monospace,monospace}
     <button class="sec tiny" id="resync">Resync NTP</button>
     <button class="sec tiny" id="reboot">Reboot</button>
   </div>
+</section>
+
+<section>
+  <h2>Backup</h2>
+  <div class="row">
+    <button class="sec tiny" id="backup">Copy settings</button>
+    <button class="sec tiny" id="restore">Paste settings</button>
+  </div>
+  <div class="hint">Copies every setting except passwords as JSON, so a second clock can be
+  set up by pasting rather than re-entering. Passwords are never exported &mdash; the clock
+  will not read them back.</div>
+  <textarea id="backupbox" rows="4" style="margin-top:10px;display:none;font-family:ui-monospace,monospace;font-size:12px"></textarea>
 </section>
 </div>
 
@@ -423,7 +440,8 @@ function schedRow(e) {
         '<option value="0">Solid</option><option value="1">Effect</option></select></div>' +
       '<div class="fxwrap"><label>Effect</label><select class="effect">' +
         fxOptions() + '</select></div>' +
-      '<div style="flex:0 0 62px"><label>Colour</label><input type="color" class="col"></div>' +
+      '<div style="flex:0 0 108px"><label>Colour <span class="cn"></span></label>' +
+        '<input type="color" class="col"></div>' +
     '</div>' +
     '<div class="row">' +
       '<div><label>Brightness <span class="brv"></span></label>' +
@@ -466,8 +484,12 @@ function schedRow(e) {
   paintMode();
 
   div.querySelector('.effect').value = String(e.effect || 0);
-  div.querySelector('.col').value = rgbToHex(
+  const col = div.querySelector('.col'), cn = div.querySelector('.cn');
+  col.value = rgbToHex(
     e.r === undefined ? 255 : e.r, e.g === undefined ? 136 : e.g, e.b === undefined ? 0 : e.b);
+  const paintCn = () => cn.textContent = colourName(...hexToRgb(col.value));
+  col.oninput = paintCn;
+  paintCn();
 
   const br = div.querySelector('.br'), brv = div.querySelector('.brv');
   br.value = e.brightness || 60;
@@ -502,6 +524,32 @@ function readSchedule() {
 }
 
 /* ---------- helpers ---------- */
+
+/* Names a colour in words.
+   The swatch alone is useless to anyone with colour vision deficiency, and
+   "#ff8800" is not much better at a glance -- so say "amber". Hue buckets with a
+   couple of special cases for the greys and near-whites. */
+function colourName(r, g, b) {
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  const v = max / 255, d = max - min, sat = max ? d / max : 0;
+  if (v < 0.08) return 'black';
+  if (sat < 0.12) return v > 0.85 ? 'white' : v > 0.4 ? 'light grey' : 'dark grey';
+  let h;
+  if (max === min) h = 0;
+  else if (max === r) h = ((g - b) / d + (g < b ? 6 : 0)) * 60;
+  else if (max === g) h = ((b - r) / d + 2) * 60;
+  else h = ((r - g) / d + 4) * 60;
+  const NAMES = [
+    [12, 'red'], [26, 'orange'], [45, 'amber'], [68, 'yellow'], [82, 'lime'],
+    [150, 'green'], [175, 'teal'], [195, 'cyan'], [210, 'sky blue'], [250, 'blue'],
+    [275, 'violet'], [300, 'purple'], [330, 'magenta'], [345, 'pink'], [361, 'red'],
+  ];
+  let name = 'red';
+  for (const [lim, n] of NAMES) if (h < lim) { name = n; break; }
+  const pale = sat < 0.45 ? 'pale ' : '';
+  const dark = v < 0.35 ? 'dark ' : '';
+  return dark + pale + name;
+}
 
 const hex2 = n => n.toString(16).padStart(2, '0');
 const rgbToHex = (r, g, b) => '#' + hex2(r) + hex2(g) + hex2(b);
@@ -572,6 +620,8 @@ async function loadAll() {
   $('#digits').value = String(cf.digits);
   $('#hourfmt').value = String(cf.hour_format);
   $('#blankzero').checked = !!cf.blank_hour_zero;
+  $('#dst').checked = cf.observe_dst !== 0;
+  paintColourName();
   $('#mqtthost').value = cf.mqtt_host;
   $('#mqttport').value = cf.mqtt_port;
   $('#mqttuser').value = cf.mqtt_user;
@@ -648,7 +698,8 @@ function paintStatus(d) {
                               : 'no sunrise/sunset at this latitude'],
     ['Effect', d.fx_name + ' &nbsp;<span style="display:inline-block;width:11px;height:11px;' +
       'border-radius:3px;vertical-align:-1px;background:rgb(' + d.lit.join(',') + ')"></span>'],
-    ['Timezone rule', d.tz_ok ? pill('valid', 'ok') : pill('invalid — using default', 'bad')],
+    ['Timezone rule', (d.tz_ok ? pill('valid', 'ok') : pill('invalid — using default', 'bad')) +
+      (d.observe_dst ? '' : ' ' + pill('DST off', 'warn'))],
     ['NTP', !d.synced ? pill('never synced', 'bad')
         : d.ntp_stale ? pill('stale, ' + dur(d.ntp_age) + ' ago', 'warn')
         : pill('synced ' + dur(d.ntp_age) + ' ago', 'ok')],
@@ -677,6 +728,7 @@ async function save() {
     tz: rule, ntp: $('#ntp').value.trim(), lat, lon,
     digits: +$('#digits').value, hour_format: +$('#hourfmt').value,
     blank_hour_zero: $('#blankzero').checked ? 1 : 0,
+    observe_dst: $('#dst').checked ? 1 : 0,
     mode: +$('#mode').value, effect: +$('#effect').value,
     r: c[0], g: c[1], b: c[2], brightness: +$('#bright').value,
     mqtt_host: $('#mqtthost').value.trim(), mqtt_port: +$('#mqttport').value || 1883,
@@ -717,6 +769,11 @@ $('#lat').addEventListener('input', e => {
 });
 $('#lon').addEventListener('input', updateSolar);
 $('#tz').addEventListener('change', () => { refreshTzRule(); updateSolar(); });
+function paintColourName() {
+  const c = hexToRgb($('#color').value);
+  $('#colorname').textContent = '— ' + colourName(...c) + ' ' + $('#color').value;
+}
+$('#color').addEventListener('input', paintColourName);
 $('#bright').addEventListener('input', e => $('#brightv').textContent = e.target.value + '%');
 $('#mode').addEventListener('change', e =>
   $('#effectwrap').style.display = (e.target.value === '1') ? '' : 'none');
@@ -740,6 +797,43 @@ $('#auto').onclick = () => {
   } else {
     say('Enter your coordinates by hand — see "How do I find my coordinates?" above.', 'err');
   }
+};
+
+$('#backup').onclick = async () => {
+  try {
+    const [cf, sc] = await Promise.all([get('/api/config'), get('/api/schedule')]);
+    // Passwords are deliberately absent: the clock never reads them back, so an
+    // export cannot leak one, and a restore leaves the target's own untouched.
+    delete cf.has_mqtt_pass; delete cf.has_web_pass; delete cf.effects;
+    const blob = JSON.stringify({config: cf, schedule: sc.schedule}, null, 1);
+    const box = $('#backupbox');
+    box.style.display = ''; box.value = blob; box.select();
+    let copied = false;
+    try { await navigator.clipboard.writeText(blob); copied = true; } catch (e) {}
+    say(copied ? 'Settings copied to the clipboard.' : 'Settings below — copy them.', 'good');
+  } catch (e) { say(e.message, 'err'); }
+};
+
+$('#restore').onclick = async () => {
+  const box = $('#backupbox');
+  if (box.style.display === 'none' || !box.value.trim()) {
+    box.style.display = '';
+    box.placeholder = 'Paste exported settings here, then press Paste settings again.';
+    box.focus();
+    say('Paste the settings, then press the button again.');
+    return;
+  }
+  let data;
+  try { data = JSON.parse(box.value); }
+  catch (e) { say('That is not valid settings JSON.', 'err'); return; }
+  if (!data.config) { say('No "config" section in that JSON.', 'err'); return; }
+  try {
+    say('Restoring…');
+    await post('/api/config', data.config);
+    if (Array.isArray(data.schedule)) await post('/api/schedule', {schedule: data.schedule});
+    await loadAll();
+    say('Restored. Passwords were not included and are unchanged.', 'good');
+  } catch (e) { say(e.message, 'err'); }
 };
 
 $('#resync').onclick = async () => {

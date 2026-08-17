@@ -64,6 +64,11 @@ void Timekeep::begin() {
         // back to a sane default and let the status page report the problem.
         tzParse("EST5EDT,M3.2.0,M11.1.0/2", g_tz);
     }
+
+    // Applied last so it covers the fallback too. Suppressing the rule's DST
+    // half rather than rewriting the stored rule means switching the setting
+    // back needs no re-derivation from the browser.
+    if (!cfg.observe_dst) g_tz.has_dst = false;
 }
 
 void Timekeep::tick() {
@@ -102,6 +107,7 @@ bool Timekeep::tzValid() { return g_tzValid; }
 bool Timekeep::setTz(const char *posix) {
     TzInfo probe;
     if (!tzParse(posix, probe)) return false;
+    if (!cfg.observe_dst) probe.has_dst = false;
     g_tz = probe;
     g_tzValid = true;
     strncpy(cfg.tz, posix, sizeof(cfg.tz) - 1);

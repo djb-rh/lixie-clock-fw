@@ -11,11 +11,21 @@ firmware, which had compile-time colors and four hardcoded modes.
 
 ## Status
 
-**Phase 5 (Home Assistant) complete.** `shop-clock` keeps correct local time with full DST
+**Phase 6 (polish) in progress — feature-complete.** `shop-clock` keeps correct local time with full DST
 handling, is configurable from a browser at `http://<clock-ip>/`, runs eight lighting
 effects at 30 fps, switches settings on a sunrise/sunset-aware schedule, and appears in
-Home Assistant automatically as a light plus diagnostics. Phase 6 is polish and deploying
-to the second clock. See `docs/` for per-phase results.
+Home Assistant automatically as a light plus diagnostics. Only deployment to the second clock remains. See `docs/` for per-phase results,
+`docs/deploying.md` to flash a clock, and `docs/hardware.md` for wiring.
+
+### Settings worth knowing
+
+- **Observe daylight saving time** can be turned off to stay on standard time year-round.
+  The full timezone rule stays stored either way, so turning it back on needs no
+  re-selection.
+- **Backup → Copy settings** exports everything except passwords as JSON, so a second clock
+  can be set up by pasting. Passwords are never exported — the clock will not read them
+  back — so they are typed once per clock.
+- Colours are labelled in words as well as shown as a swatch.
 
 ### Home Assistant
 
