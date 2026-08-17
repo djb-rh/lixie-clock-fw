@@ -46,6 +46,8 @@ dd{margin:0;text-align:right;font-family:ui-monospace,monospace}
 .bar>button{max-width:320px}
 #msg{font-size:13px;text-align:center;min-height:18px;margin-top:6px}
 .err{color:var(--bad)}.good{color:var(--ok)}
+#ovr{display:none;background:#3a2d0c;border-left:3px solid var(--warn);padding:10px 12px;border-radius:4px;margin-bottom:12px;font-size:13px}
+#ovr button{margin-top:8px}
 </style>
 
 <div class="wrap">
@@ -88,6 +90,7 @@ dd{margin:0;text-align:right;font-family:ui-monospace,monospace}
 
 <section>
   <h2>Display</h2>
+  <div id="ovr"></div>
   <label for="mode">Mode</label>
   <select id="mode">
     <option value="0">Solid colour</option>
@@ -140,8 +143,8 @@ dd{margin:0;text-align:right;font-family:ui-monospace,monospace}
     <div><label for="mqttuser">Username</label><input id="mqttuser" autocomplete="off"></div>
     <div><label for="mqttpass">Password</label><input id="mqttpass" type="password" autocomplete="new-password" placeholder="unchanged"></div>
   </div>
-  <div class="hint">The clock publishes Home Assistant discovery automatically and appears
-  as a light. Connection starts in a later firmware phase.</div>
+  <div class="hint" id="mqttstate">The clock publishes Home Assistant discovery
+  automatically and appears as a light.</div>
 </section>
 
 <section>
@@ -600,8 +603,36 @@ function paintStatus(d) {
     return t(e) + (sameDay ? '' : ' ' + d2.toLocaleDateString([], {month: 'short', day: 'numeric'}));
   };
 
+  const ovr = $('#ovr');
+  if (d.ha_override) {
+    ovr.style.display = '';
+    ovr.innerHTML = '<b>Home Assistant is controlling this clock</b>' +
+      (d.ha_since ? ' &mdash; since ' + when(d.ha_since) : '') +
+      '<br>Settings below are stored but not shown until control is handed back.' +
+      '<button class="sec tiny" id="release">Return to schedule</button>';
+    $('#release').onclick = async () => {
+      try { await post('/api/action', {action: 'release'}); say('Returned to schedule.', 'good');
+            paintStatus(await get('/api/state')); }
+      catch (e) { say(e.message, 'err'); }
+    };
+  } else {
+    ovr.style.display = 'none';
+  }
+
+  const mq = $('#mqttstate');
+  if (mq) {
+    if (!d.mqtt_configured) mq.innerHTML = 'No broker set &mdash; Home Assistant integration is off.';
+    else if (d.mqtt) mq.innerHTML = 'Connected to the broker. ' + pill('online', 'ok') +
+      ' <span style="color:var(--dim)">' + d.mqtt_cmds + ' commands received</span>';
+    else mq.innerHTML = pill('not connected', 'bad') +
+      (d.mqtt_error ? ' <span style="color:var(--dim)">' + d.mqtt_error + '</span>' : '');
+  }
+
   let showing;
-  if (d.source === 'schedule') {
+  if (d.source === 'homeassistant') {
+    showing = pill('Home Assistant', 'warn') +
+              (d.ha_since ? ' <span style="color:var(--dim)">since ' + when(d.ha_since) + '</span>' : '');
+  } else if (d.source === 'schedule') {
     showing = pill('schedule entry ' + (d.entry + 1), 'ok') +
               (d.since ? ' <span style="color:var(--dim)">since ' + when(d.since) + '</span>' : '');
   } else {

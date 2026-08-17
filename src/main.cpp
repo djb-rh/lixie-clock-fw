@@ -21,6 +21,7 @@
 #include "control.h"
 #include "display.h"
 #include "httpd.h"
+#include "mqtt_ha.h"
 #include "netwatch.h"
 #include "timekeep.h"
 
@@ -87,6 +88,17 @@ void renderNow(bool force) {
     // schedule entry (and, from Phase 5, Home Assistant) outranks the base
     // settings, and Control is the single place that knows the precedence.
     const Control::Settings act = Control::active();
+
+    // Home Assistant can turn the display off outright. Blank rather than
+    // dimming to 1%: "off" in HA has to mean dark, not faintly glowing.
+    if (!act.on) {
+        if (force || g_last.valid) {
+            Display::clear();
+            Display::show(0);
+            g_last = Rendered{};
+        }
+        return;
+    }
 
     // FX_SOLID in effect mode is still a static display, so treat it as one.
     const uint8_t fx = (act.mode == MODE_EFFECT) ? act.effect : (uint8_t)FX_SOLID;
@@ -173,6 +185,7 @@ void setup() {
     Display::setDigitCount(cfg.digits);
     Timekeep::begin();
     Control::begin();
+    MqttHa::begin();
 
     Particle.variable("freemem", vFreeMem);
     Particle.variable("bootcount", vBootCount);
@@ -207,7 +220,10 @@ void loop() {
     NetWatch::tick();
     Timekeep::tick();
     Control::tick();
-    if (NetWatch::wifiUp()) Httpd::tick();
+    if (NetWatch::wifiUp()) {
+        Httpd::tick();
+        MqttHa::tick();
+    }
 
     if (now - g_lastRender >= FRAME_MS) {
         g_lastRender = now;

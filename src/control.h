@@ -24,9 +24,11 @@ namespace Control {
 enum Source : uint8_t {
     SRC_DEFAULT = 0,     // the configured base settings
     SRC_SCHEDULE = 1,    // a schedule entry
+    SRC_HA = 2,          // Home Assistant, sticky until released
 };
 
 struct Settings {
+    bool on;             // Home Assistant can turn the display off entirely
     uint8_t mode;
     uint8_t effect;
     uint8_t r, g, b;
@@ -46,5 +48,16 @@ int64_t nextChange();    // 0 if nothing is scheduled
 
 // Today's sun times, for the status page. valid=false at polar latitudes.
 SunTimes sunToday();
+
+// --- Home Assistant override ---
+//
+// Sticky by design: once Home Assistant sets something it holds indefinitely,
+// and only an explicit release hands control back to the schedule. Nothing
+// silently undoes what an automation did -- a schedule transition arriving
+// later must not quietly stomp it.
+void setOverride(const Settings &s);
+void releaseOverride();
+bool overridden();
+int64_t overrideSince();
 
 }  // namespace Control

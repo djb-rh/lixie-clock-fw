@@ -19,10 +19,15 @@ int64_t g_since = 0;
 int64_t g_next = 0;
 SunTimes g_sun{};
 
+bool g_haActive = false;
+Control::Settings g_ha{};
+int64_t g_haSince = 0;
+
 bool timeUsable() { return (uint32_t)Time.now() > 1735689600UL; }   // after 2025
 
 void resolve() {
     // The base layer is whatever the config page last stored.
+    g_active.on = true;
     g_active.mode = cfg.mode;
     g_active.effect = cfg.effect;
     g_active.r = cfg.r;
@@ -53,6 +58,7 @@ void resolve() {
 
     if (!r.active) return;
 
+    g_active.on = true;
     g_active.mode = r.mode;
     g_active.effect = r.effect;
     g_active.r = r.r;
@@ -62,6 +68,17 @@ void resolve() {
     g_source = Control::SRC_SCHEDULE;
     g_entry = r.entry;
     g_since = r.since_utc;
+}
+
+// Applied after everything else, so no lower layer can overwrite it. Kept
+// separate from resolve() because the override must survive a re-resolve --
+// which happens every few seconds, and on every config change.
+void applyOverride() {
+    if (!g_haActive) return;
+    g_active = g_ha;
+    g_source = Control::SRC_HA;
+    g_entry = -1;
+    g_since = g_haSince;
 }
 
 }  // namespace
@@ -79,6 +96,7 @@ void Control::tick() {
     g_lastResolve = now;
     g_dirty = false;
     resolve();
+    applyOverride();
 }
 
 Control::Settings Control::active() { return g_active; }
@@ -90,7 +108,28 @@ SunTimes Control::sunToday() { return g_sun; }
 
 const char *Control::sourceName() {
     switch (g_source) {
+        case SRC_HA: return "homeassistant";
         case SRC_SCHEDULE: return "schedule";
         default: return "default";
     }
 }
+
+void Control::setOverride(const Settings &s) {
+    // Only stamp the start time on the transition INTO override, so repeated
+    // commands from an automation do not keep resetting "overridden since".
+    if (!g_haActive) g_haSince = (int64_t)Time.now();
+    g_haActive = true;
+    g_ha = s;
+    g_dirty = true;
+    tick();
+}
+
+void Control::releaseOverride() {
+    g_haActive = false;
+    g_haSince = 0;
+    g_dirty = true;
+    tick();
+}
+
+bool Control::overridden() { return g_haActive; }
+int64_t Control::overrideSince() { return g_haSince; }

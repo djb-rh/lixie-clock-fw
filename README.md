@@ -11,10 +11,21 @@ firmware, which had compile-time colors and four hardcoded modes.
 
 ## Status
 
-**Phase 4 (solar + scheduler) complete.** `shop-clock` keeps correct local time with full
-DST handling, is configurable from a browser at `http://<clock-ip>/`, runs eight lighting
-effects at 30 fps, and switches settings on a schedule that can be anchored to sunrise and
-sunset. Home Assistant is Phase 5. See `docs/` for per-phase results.
+**Phase 5 (Home Assistant) complete.** `shop-clock` keeps correct local time with full DST
+handling, is configurable from a browser at `http://<clock-ip>/`, runs eight lighting
+effects at 30 fps, switches settings on a sunrise/sunset-aware schedule, and appears in
+Home Assistant automatically as a light plus diagnostics. Phase 6 is polish and deploying
+to the second clock. See `docs/` for per-phase results.
+
+### Home Assistant
+
+Set the broker under **Home Assistant** on the config page. Use the broker host's **IP or
+a DNS-resolvable name** — `core-mosquitto` is internal to Home Assistant's container
+network and `*.local` is mDNS, neither of which a Photon can resolve.
+
+Control from Home Assistant is **sticky**: it holds until you press *Return to schedule*
+(in HA, or in the banner on the config page). A schedule transition will not take control
+back on its own.
 
 ## Tests
 

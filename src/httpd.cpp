@@ -6,6 +6,7 @@
 #include "control.h"
 #include "display.h"
 #include "json.h"
+#include "mqtt_ha.h"
 #include "netwatch.h"
 #include "timekeep.h"
 #include "web_assets.h"
@@ -179,7 +180,10 @@ void serveState(TCPClient &c) {
         // land. Wait for this string to change instead.
         "\"auth\":%s,\"digits\":%u,\"leds\":%u,\"frames\":%lu,"
         "\"fx\":%u,\"fx_name\":\"%s\",\"lit\":[%u,%u,%u],"
-        "\"brightness\":%u,\"source\":\"%s\",\"entry\":%d,\"since\":%lu,\"next\":%lu,"
+        "\"brightness\":%u,\"source\":\"%s\",\"entry\":%d,"
+        "\"ha_override\":%s,\"ha_since\":%lu,\"mqtt\":%s,"
+        "\"mqtt_configured\":%s,\"mqtt_connects\":%lu,\"mqtt_cmds\":%lu,"
+        "\"mqtt_error\":\"%s\",\"since\":%lu,\"next\":%lu,"
         "\"sunrise\":%lu,\"sunset\":%lu,\"sun_valid\":%s,"
         "\"build\":\"" __DATE__ " " __TIME__ "\""
         "}",
@@ -211,6 +215,13 @@ void serveState(TCPClient &c) {
         // unsigned 32-bit value until 2106, which outlives the hardware.
         actNow.brightness,
         Control::sourceName(), (int)Control::scheduleEntry(),
+        Control::overridden() ? "true" : "false",
+        (unsigned long)Control::overrideSince(),
+        MqttHa::connected() ? "true" : "false",
+        MqttHa::configured() ? "true" : "false",
+        (unsigned long)MqttHa::connectCount(),
+        (unsigned long)MqttHa::commandCount(),
+        MqttHa::lastError(),
         (unsigned long)Control::since(), (unsigned long)Control::nextChange(),
         (unsigned long)Control::sunToday().rise_utc,
         (unsigned long)Control::sunToday().set_utc,
@@ -503,6 +514,7 @@ void handle(TCPClient &c, const char *req, const char *body, size_t bodyLen) {
         }
         configSave();
         Control::invalidate();
+        MqttHa::notifyChanged();
         sendOk(c);
     } else if (isPost && !strncmp(path, "/api/schedule", 13)) {
         char err[96] = "";
@@ -512,6 +524,7 @@ void handle(TCPClient &c, const char *req, const char *body, size_t bodyLen) {
         }
         configSave();
         Control::invalidate();
+        MqttHa::notifyChanged();
         sendOk(c);
     } else if (isPost && !strncmp(path, "/api/action", 11)) {
         char what[24] = "";
@@ -520,6 +533,10 @@ void handle(TCPClient &c, const char *req, const char *body, size_t bodyLen) {
         if (!strcmp(what, "resync")) {
             sendText(c, "200 OK", Timekeep::syncNow()
                      ? "{\"ok\":true}" : "{\"ok\":false,\"error\":\"NTP failed\"}");
+        } else if (!strcmp(what, "release")) {
+            Control::releaseOverride();
+            MqttHa::notifyChanged();
+            sendOk(c);
         } else if (!strcmp(what, "reboot")) {
             sendOk(c);
             c.flush(); delay(200); c.stop();
