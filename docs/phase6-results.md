@@ -108,6 +108,29 @@ addition if wanted later.
   configure, verify in Home Assistant, and roll back
 - `docs/hardware.md` — wiring, digit mapping, power, platform constraints
 
+## Soak
+
+80 minutes of sampling at 2-minute intervals, spanning both outage tests. The final
+**55-minute uninterrupted stretch** (`boots` constant at 26):
+
+| | |
+|---|---|
+| Samples answered | 28 / 28 |
+| Free heap | 26,760 bytes at every sample but one |
+| Frames rendered | 100,520, steady at ~30 fps |
+| Wi-Fi / cloud / MQTT | up throughout |
+| Reboots, Wi-Fi recoveries | none |
+| RSSI | −68 to −72 dBm |
+
+One sample read 24,232 bytes free — about 2.5 kB below the flat line — and the next
+returned to exactly 26,760. A transient allocation during request handling that releases
+cleanly, not a leak: a leak does not come back to precisely its previous value. Worth
+recording rather than smoothing over, since free memory is the number most likely to
+reveal a slow problem on this platform.
+
+The three unreachable samples in the log are the *first* outage test, before the
+re-listen fix. There are none afterwards.
+
 ## Both clocks deployed
 
 `Clock2` flashed with a plain `particle flash` — the Product claim needed no special
