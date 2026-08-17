@@ -6,6 +6,12 @@ Eight effects, selectable from the config page, animating on hardware.
 Flash  54,256 / 131,072   Static RAM  11,412   Free heap  ~31,300
 ```
 
+![Rainbow Flow running on a four-digit clock](images/rainbow-flow.gif)
+
+*Hue varies with panel position, which is the property
+`tests/effects_test.cpp` asserts numerically as `flowSpread > 60` — this is the same claim
+in a form anyone can check at a glance.*
+
 ## Design
 
 An effect is a **pure function** of `(panel position, time, base colour)` — no state, no
@@ -87,8 +93,9 @@ from a stalled one remotely.
 The soak was the point: it confirms that interrupt-disabling LED writes at 30 fps do not
 destabilise the radio, which was the one real risk in this phase.
 
-## Still outstanding
+## Confirmed by eye
 
-Nobody has *looked* at the clock yet — every effect is verified by its maths and by the
-colours the firmware reports, not by eye. Worth a glance to confirm the speeds are
-tasteful rather than merely correct. The shop clock is back on solid amber.
+Every effect was initially verified by its maths and by the colours the firmware reported,
+not by looking at anything — which left open whether the speeds were *tasteful* as well as
+correct. They are: the clock's owner reported the effects looked good, and the clip above
+is Rainbow Flow running on real hardware.

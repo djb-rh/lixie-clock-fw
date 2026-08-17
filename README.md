@@ -9,13 +9,31 @@ and shows up in Home Assistant automatically over MQTT.
 Replaces the earlier [djb-rh/lixie-clock](https://github.com/djb-rh/lixie-clock)
 firmware, which had compile-time colors and four hardcoded modes.
 
+![A four-digit Lixie clock reading 10:10, each digit panel lit a different hue, the colours sweeping slowly from left to right](docs/images/rainbow-flow.gif)
+
+*Rainbow Flow. The hue is a function of each panel's position across the display, so the
+colour sweeps rather than the whole clock changing together — that is what distinguishes it
+from Rainbow Cycle. Full clip: [rainbow-flow.mp4](docs/images/rainbow-flow.mp4) (plays in
+GitHub's file viewer).*
+
 ## Status
 
-**Feature-complete.** All six phases done and verified on hardware. `shop-clock` keeps correct local time with full DST
-handling, is configurable from a browser at `http://<clock-ip>/`, runs eight lighting
-effects at 30 fps, switches settings on a sunrise/sunset-aware schedule, and appears in
-Home Assistant automatically as a light plus diagnostics. Both clocks are deployed and live in Home Assistant. See `docs/` for per-phase results,
-`docs/deploying.md` to flash a clock, and `docs/hardware.md` for wiring.
+**Feature-complete.** All six phases done and verified on hardware. Both clocks keep correct
+local time with full DST handling, are configurable from a browser at `http://<clock-ip>/`,
+run eight lighting effects at 30 fps, switch settings on a sunrise/sunset-aware schedule,
+and appear in Home Assistant automatically as a light plus diagnostics. See `docs/` for
+per-phase results, `docs/deploying.md` to flash a clock, and `docs/hardware.md` for wiring.
+
+### Effects
+
+`Solid` · `Rainbow Flow` · `Rainbow Cycle` · `Breathe` · `Pulse` · `Comet` · `Twinkle` ·
+`Warm Glow`
+
+<img src="docs/images/rainbow-flow.jpg" width="480" alt="The same clock photographed head-on, digits lit green, cyan, blue and magenta">
+
+No effect is allowed to black out the display — a clock you cannot read is not a clock — so
+the brightness-modulating effects floor rather than dipping to zero. See
+`docs/phase3-results.md`.
 
 ### Settings worth knowing
 
