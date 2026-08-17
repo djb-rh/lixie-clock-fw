@@ -15,5 +15,6 @@ void tick();
 
 uint32_t requestCount();
 uint32_t rejectedAuth();
+uint32_t rebinds();   // times the listening socket was recreated after a Wi-Fi drop
 
 }  // namespace Httpd

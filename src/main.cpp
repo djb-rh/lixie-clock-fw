@@ -34,6 +34,20 @@ const uint32_t SANE_MIN_UNIX = 1735689600UL;   // 2025-01-01; below this, unsync
 
 ApplicationWatchdog *g_wd;
 
+// Wi-Fi outage self-test.
+//
+// Taking down every access point in the house to test one clock is the wrong
+// trade, so the clock takes ITSELF off the air instead: WiFi.off() exercises
+// exactly the path the recovery ladder handles.
+//
+// g_outageDeadline is the safety net, and it deliberately lives here rather
+// than in netwatch. If the ladder under test is broken, something that shares
+// no logic with it has to bring the clock back -- otherwise the test can strand
+// a device nobody is standing next to. The 120 s application watchdog sits
+// underneath this in turn.
+uint32_t g_outageDeadline = 0;
+const uint32_t OUTAGE_BACKSTOP_MS = 6UL * 60UL * 1000UL;
+
 // Cloud variables double as the plan's out-of-band rescue path for a clock that
 // has fallen off the LAN.
 int32_t vFreeMem = 0;
@@ -177,6 +191,14 @@ int fnFactory(String) {
 
 }  // namespace
 
+// Deliberately at file scope, not in the anonymous namespace: httpd.cpp calls it.
+void armOutageTest() {
+    g_outageDeadline = millis() + OUTAGE_BACKSTOP_MS;
+    if (!g_outageDeadline) g_outageDeadline = 1;   // millis() wrap guard
+    WiFi.disconnect();
+    WiFi.off();
+}
+
 void setup() {
     NetWatch::begin();
     configLoad();
@@ -217,13 +239,19 @@ void setup() {
 void loop() {
     uint32_t now = millis();
 
+    // Checked first, and independent of NetWatch by design.
+    if (g_outageDeadline && (int32_t)(now - g_outageDeadline) >= 0) {
+        System.reset();
+    }
+
     NetWatch::tick();
     Timekeep::tick();
     Control::tick();
-    if (NetWatch::wifiUp()) {
-        Httpd::tick();
-        MqttHa::tick();
-    }
+    // Called unconditionally: each does its own Wi-Fi check, and Httpd needs to
+    // observe the down->up edge in order to recreate its listening socket. Gating
+    // these on wifiUp() here would hide that edge entirely.
+    Httpd::tick();
+    MqttHa::tick();
 
     if (now - g_lastRender >= FRAME_MS) {
         g_lastRender = now;

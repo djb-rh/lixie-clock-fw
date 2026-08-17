@@ -11,10 +11,10 @@ firmware, which had compile-time colors and four hardcoded modes.
 
 ## Status
 
-**Phase 6 (polish) in progress — feature-complete.** `shop-clock` keeps correct local time with full DST
+**Feature-complete.** All six phases done and verified on hardware. `shop-clock` keeps correct local time with full DST
 handling, is configurable from a browser at `http://<clock-ip>/`, runs eight lighting
 effects at 30 fps, switches settings on a sunrise/sunset-aware schedule, and appears in
-Home Assistant automatically as a light plus diagnostics. Only deployment to the second clock remains. See `docs/` for per-phase results,
+Home Assistant automatically as a light plus diagnostics. Only deployment to the second clock remains — see `docs/deploying.md`. See `docs/` for per-phase results,
 `docs/deploying.md` to flash a clock, and `docs/hardware.md` for wiring.
 
 ### Settings worth knowing

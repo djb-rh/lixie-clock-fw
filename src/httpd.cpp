@@ -11,6 +11,9 @@
 #include "timekeep.h"
 #include "web_assets.h"
 
+// Defined in main.cpp, which owns the backstop deadline.
+void armOutageTest();
+
 namespace {
 
 TCPServer server(80);
@@ -62,6 +65,17 @@ void app(Out &o, const char *fmt, ...) {
 
 uint32_t g_requests = 0;
 uint32_t g_rejected = 0;
+
+// Tracks the Wi-Fi edge so the listening socket can be recreated.
+//
+// WiFi.off() tears down the interface and takes the TCPServer's listening
+// socket with it. Re-associating does NOT bring it back: the radio comes up,
+// WiFi.ready() reports true, the recovery ladder is satisfied -- and the clock
+// silently stops answering on port 80 until something reboots it. Found by
+// deliberately dropping the radio and watching the clock come back only when an
+// unrelated backstop reset fired.
+bool g_wifiWasUp = false;
+uint32_t g_rebinds = 0;
 
 // --- response helpers -------------------------------------------------------
 
@@ -173,7 +187,7 @@ void serveState(TCPClient &c) {
         "\"tz_ok\":%s,\"std_off\":%ld,\"dst_off\":%ld,\"observe_dst\":%s,"
         "\"wifi\":%s,\"cloud\":%s,\"rssi\":%d,\"ip\":\"%s\",\"ssid\":\"%s\","
         "\"uptime\":%lu,\"freemem\":%lu,\"boots\":%lu,\"recoveries\":%lu,"
-        "\"reset_reason\":\"%s\",\"requests\":%lu,"
+        "\"reset_reason\":\"%s\",\"requests\":%lu,\"rebinds\":%lu,"
         // A per-compile stamp, not a phase name. Polling an endpoint until it
         // merely *answers* is useless after an OTA -- the outgoing firmware
         // answers too, so you read stale values and conclude your fix did not
@@ -203,7 +217,7 @@ void serveState(TCPClient &c) {
         (unsigned long)NetWatch::bootCount(),
         (unsigned long)NetWatch::wifiRecoveries(),
         resetReasonName(NetWatch::lastResetReason()),
-        (unsigned long)g_requests,
+        (unsigned long)g_requests, (unsigned long)g_rebinds,
         cfg.web_pass[0] ? "true" : "false",
         cfg.digits, Display::ledCount(), (unsigned long)Display::frameCount(),
         fxNow, EFFECT_NAMES[fxNow],
@@ -545,6 +559,12 @@ void handle(TCPClient &c, const char *req, const char *body, size_t bodyLen) {
             Control::releaseOverride();
             MqttHa::notifyChanged();
             sendOk(c);
+        } else if (!strcmp(what, "wifitest")) {
+            // Answer BEFORE dropping the radio, or the caller never hears back.
+            sendOk(c);
+            c.flush(); delay(200); c.stop();
+            armOutageTest();
+            return;
         } else if (!strcmp(what, "reboot")) {
             sendOk(c);
             c.flush(); delay(200); c.stop();
@@ -565,12 +585,24 @@ void handle(TCPClient &c, const char *req, const char *body, size_t bodyLen) {
 
 }  // namespace
 
-void Httpd::begin() { server.begin(); }
+void Httpd::begin() {
+    server.begin();
+    g_wifiWasUp = WiFi.ready();
+}
 
 uint32_t Httpd::requestCount() { return g_requests; }
 uint32_t Httpd::rejectedAuth() { return g_rejected; }
+uint32_t Httpd::rebinds() { return g_rebinds; }
 
 void Httpd::tick() {
+    bool up = WiFi.ready();
+    if (up && !g_wifiWasUp) {
+        server.begin();          // re-listen after the interface came back
+        g_rebinds++;
+    }
+    g_wifiWasUp = up;
+    if (!up) return;
+
     TCPClient c = server.available();
     if (!c) return;
 
