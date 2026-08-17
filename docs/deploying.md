@@ -29,8 +29,8 @@ unless they are marked as a **development device**. If the command above is refu
   particle flash --product 42326 270049000251353530373132 /tmp/lixie.bin
   ```
 
-This has not been exercised — `shop-clock` is a plain developer device and everything so
-far was deployed to it. Expect one of the two paths to need a moment's fiddling.
+**In practice the plain `particle flash Clock2 <bin>` worked** — the Product claim did not
+get in the way, and neither fallback was needed. Keep them noted in case that changes.
 
 ### Verifying the flash actually landed
 
@@ -87,7 +87,10 @@ Home Assistant has a static DHCP lease, so `10.0.0.18` is stable.
 `Lixie Clock <id>`, where `<id>` is the last six characters of the Particle device ID. Each
 clock gets its own id, so both appear separately.
 
-`shop-clock` is `Lixie Clock 343437`.
+| Device | Home Assistant name | IP |
+|---|---|---|
+| `shop-clock` | `Lixie Clock 343437` | 10.0.1.14 |
+| `Clock2` | `Lixie Clock 373132` | 10.0.1.167 |
 
 ## Rolling back
 

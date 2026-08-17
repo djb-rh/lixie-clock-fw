@@ -14,7 +14,7 @@ firmware, which had compile-time colors and four hardcoded modes.
 **Feature-complete.** All six phases done and verified on hardware. `shop-clock` keeps correct local time with full DST
 handling, is configurable from a browser at `http://<clock-ip>/`, runs eight lighting
 effects at 30 fps, switches settings on a sunrise/sunset-aware schedule, and appears in
-Home Assistant automatically as a light plus diagnostics. Only deployment to the second clock remains — see `docs/deploying.md`. See `docs/` for per-phase results,
+Home Assistant automatically as a light plus diagnostics. Both clocks are deployed and live in Home Assistant. See `docs/` for per-phase results,
 `docs/deploying.md` to flash a clock, and `docs/hardware.md` for wiring.
 
 ### Settings worth knowing
@@ -59,8 +59,8 @@ Both vector files are committed, so `make` alone needs neither tool.
 
 | Clock | Device ID | Notes |
 |---|---|---|
-| `Clock2` | `270049000251353530373132` | Particle Product 42326 |
-| `shop-clock` | `290028001047363333343437` | Developer device |
+| `Clock2` | `270049000251353530373132` | Particle Product 42326 · `Lixie Clock 373132` |
+| `shop-clock` | `290028001047363333343437` | Developer device · `Lixie Clock 343437` |
 
 WS2812B, 20 LEDs per digit, data on `D0`. Digit count is configurable (2–6).
 

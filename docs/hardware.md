@@ -43,10 +43,11 @@ default brightness of 60% reduces it further.
 | Name | Device ID | Notes |
 |---|---|---|
 | `shop-clock` | `290028001047363333343437` | Plain developer device. All development happened here. |
-| `Clock2` | `270049000251353530373132` | Claimed to Particle Product 42326 — see `docs/deploying.md` |
+| `Clock2` | `270049000251353530373132` | Claimed to Particle Product 42326, but flashes normally with `particle flash` |
 
 `shop-clock` sits at about **−71 dBm** RSSI. Workable, but the weak end of usable, and the
-first thing to suspect if that clock ever misbehaves on the network.
+first thing to suspect if that clock ever misbehaves on the network. `Clock2` is far
+healthier at about **−39 dBm**.
 
 ## Platform constraints worth remembering
 

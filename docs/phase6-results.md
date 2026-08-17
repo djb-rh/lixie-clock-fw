@@ -108,8 +108,23 @@ addition if wanted later.
   configure, verify in Home Assistant, and roll back
 - `docs/hardware.md` — wiring, digit mapping, power, platform constraints
 
-## Outstanding
+## Both clocks deployed
 
-**`Clock2` has not been flashed.** By request, deployment to it is left to its owner;
-`docs/deploying.md` covers both flash paths, since whether it is marked as a development
-device could not be determined without attempting one.
+`Clock2` flashed with a plain `particle flash` — the Product claim needed no special
+handling, which settles the one deployment unknown carried since Phase 0.
+
+| Device | HA name | IP | RSSI |
+|---|---|---|---|
+| `shop-clock` | `Lixie Clock 343437` | 10.0.1.14 | −71 dBm |
+| `Clock2` | `Lixie Clock 373132` | 10.0.1.167 | −39 dBm |
+
+`Clock2` came up on defaults, which happen to be correct for this location (Eastern time,
+Durham coordinates, 4 digits), synced NTP within 15 seconds, and connected to the broker on
+the first attempt. Command and release were verified over MQTT and it was left exactly as
+found.
+
+Both clocks now appear as separate Home Assistant devices with eight entities each.
+
+## Nothing outstanding
+
+Every item carried through the six phases is closed.
