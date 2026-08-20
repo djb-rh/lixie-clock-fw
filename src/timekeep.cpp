@@ -1,5 +1,6 @@
 #include "timekeep.h"
 #include "config.h"
+#include "netwatch.h"
 
 // Rolled by hand rather than using the ntp-time library: that one burns a
 // software timer thread and cannot report how stale the last sync is, which
@@ -48,6 +49,7 @@ bool Timekeep::syncNow() {
                 g_lastSyncMs = millis();
                 g_everSynced = true;
                 ok = true;
+                NetWatch::noteAlive();
             }
             break;
         }

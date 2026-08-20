@@ -18,6 +18,12 @@ uint32_t wifiDownSeconds();     // 0 when up
 int rssi();                     // cached; WiFi.RSSI() is slow to call per frame
 uint32_t bootCount();
 int lastResetReason();
-uint32_t wifiRecoveries();      // radio restarts since boot
+uint32_t wifiRecoveries();      // re-association attempts since boot
+
+// Called by any module that successfully exchanged data with something
+// off-device. Feeds the no-traffic reboot backstop, which exists because
+// WiFi.ready() can report true on an interface that carries nothing.
+void noteAlive();
+uint32_t secondsSinceTraffic();
 
 }  // namespace NetWatch

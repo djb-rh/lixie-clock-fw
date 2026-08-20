@@ -188,6 +188,7 @@ void serveState(TCPClient &c) {
         "\"wifi\":%s,\"cloud\":%s,\"rssi\":%d,\"ip\":\"%s\",\"ssid\":\"%s\","
         "\"uptime\":%lu,\"freemem\":%lu,\"boots\":%lu,\"recoveries\":%lu,"
         "\"reset_reason\":\"%s\",\"requests\":%lu,\"rebinds\":%lu,"
+        "\"quiet\":%lu,"
         // A per-compile stamp, not a phase name. Polling an endpoint until it
         // merely *answers* is useless after an OTA -- the outgoing firmware
         // answers too, so you read stale values and conclude your fix did not
@@ -218,6 +219,7 @@ void serveState(TCPClient &c) {
         (unsigned long)NetWatch::wifiRecoveries(),
         resetReasonName(NetWatch::lastResetReason()),
         (unsigned long)g_requests, (unsigned long)g_rebinds,
+        (unsigned long)NetWatch::secondsSinceTraffic(),
         cfg.web_pass[0] ? "true" : "false",
         cfg.digits, Display::ledCount(), (unsigned long)Display::frameCount(),
         fxNow, EFFECT_NAMES[fxNow],
@@ -607,6 +609,7 @@ void Httpd::tick() {
     if (!c) return;
 
     g_requests++;
+    NetWatch::noteAlive();
 
     // Read headers up to the blank line.
     size_t len = 0;

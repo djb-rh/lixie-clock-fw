@@ -37,8 +37,13 @@ ApplicationWatchdog *g_wd;
 // Wi-Fi outage self-test.
 //
 // Taking down every access point in the house to test one clock is the wrong
-// trade, so the clock takes ITSELF off the air instead: WiFi.off() exercises
-// exactly the path the recovery ladder handles.
+// trade, so the clock takes ITSELF off the air instead.
+//
+// Uses WiFi.disconnect() rather than WiFi.off(): a disassociation is what
+// actually happens in the field when an access point drops a client, and
+// WiFi.off() is the call that deadlocked a clock hard enough to need its power
+// pulled. Testing with the dangerous call was how that got found, but there is
+// no reason to keep firing it now that it is known.
 //
 // g_outageDeadline is the safety net, and it deliberately lives here rather
 // than in netwatch. If the ladder under test is broken, something that shares
@@ -196,7 +201,6 @@ void armOutageTest() {
     g_outageDeadline = millis() + OUTAGE_BACKSTOP_MS;
     if (!g_outageDeadline) g_outageDeadline = 1;   // millis() wrap guard
     WiFi.disconnect();
-    WiFi.off();
 }
 
 void setup() {

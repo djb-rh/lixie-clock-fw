@@ -282,6 +282,7 @@ bool connectNow() {
 
     g_connects++;
     g_err[0] = 0;
+    NetWatch::noteAlive();
 
     client.publish(willTopic, "online", true);
 
@@ -316,6 +317,7 @@ void MqttHa::tick() {
 
     if (client.isConnected()) {
         client.loop();
+        NetWatch::noteAlive();   // the broker link is live
 
         uint32_t now = millis();
         if (g_dirty || (now - g_lastHeartbeat) >= HEARTBEAT_MS) {
