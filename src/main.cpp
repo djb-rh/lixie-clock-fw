@@ -20,6 +20,7 @@
 #include "config.h"
 #include "control.h"
 #include "display.h"
+#include "eventlog.h"
 #include "httpd.h"
 #include "mqtt_ha.h"
 #include "netwatch.h"
@@ -206,6 +207,7 @@ void armOutageTest() {
 void setup() {
     NetWatch::begin();
     configLoad();
+    eventLogBegin((uint8_t)min(NetWatch::lastResetReason(), 255));
 
     Display::begin();
     Display::setDigitCount(cfg.digits);

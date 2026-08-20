@@ -1,5 +1,6 @@
 #include "netwatch.h"
 
+#include "eventlog.h"
 #include "timekeep.h"
 
 // Backup-SRAM counters survive a reset, so a clock that is quietly rebooting
@@ -76,11 +77,13 @@ void NetWatch::tick() {
     g_lastCheck = now;
 
     if (WiFi.ready()) {
+        if (g_wifiDownSince) eventLog(EV_WIFI_UP, (uint8_t)min(secondsSince(g_wifiDownSince), 255UL));
         g_wifiDownSince = 0;
         if (Particle.connected()) g_lastAlive = now;
 
         uint32_t quiet = (now - g_lastAlive) / 1000;
         if (quiet > NO_TRAFFIC_RESET_AFTER_S) {
+            eventLog(EV_RESET_QUIET, (uint8_t)min(quiet / 60, 255UL));
             System.reset();
         } else if (quiet > QUIET_PROBE_AFTER_S &&
                    now - g_lastProbe > QUIET_PROBE_AFTER_S * 1000UL) {
@@ -88,18 +91,20 @@ void NetWatch::tick() {
             Timekeep::syncNow();      // updates g_lastAlive itself on success
         }
     } else {
-        if (!g_wifiDownSince) g_wifiDownSince = now;
+        if (!g_wifiDownSince) { g_wifiDownSince = now; eventLog(EV_WIFI_DOWN, 0); }
         uint32_t down = secondsSince(g_wifiDownSince);
 
         if (down > WIFI_REBOOT_AFTER_S) {
             // Rebooting is the remedy, not the last resort. It takes about ten
             // seconds and it always works; the alternative below used to be
             // cleverer and was the single worst bug in this firmware.
+            eventLog(EV_RESET_WIFI, (uint8_t)min(down, 255UL));
             System.reset();
         } else if (down > WIFI_RECONNECT_AFTER_S &&
                    now - g_lastRadioKick > WIFI_RECONNECT_AFTER_S * 1000UL) {
             g_lastRadioKick = now;
             g_wifiRecoveries++;
+            eventLog(EV_LADDER_KICK, (uint8_t)min(down, 255UL));
 
             // NEVER WiFi.off()/WiFi.on() here.
             //

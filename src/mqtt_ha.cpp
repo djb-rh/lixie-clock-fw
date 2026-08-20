@@ -6,6 +6,7 @@
 #include "control.h"
 #include "display.h"
 #include "effects.h"
+#include "eventlog.h"
 #include "json.h"
 #include "netwatch.h"
 #include "timekeep.h"
@@ -195,8 +196,11 @@ void handleSet(const char *body, size_t len) {
     char sbuf[32];
     long v;
 
-    if (jsonGetStr(body, len, "state", sbuf, sizeof(sbuf)))
-        s.on = (!strcasecmp(sbuf, "ON"));
+    if (jsonGetStr(body, len, "state", sbuf, sizeof(sbuf))) {
+        bool want = (!strcasecmp(sbuf, "ON"));
+        if (want != s.on) eventLog(want ? EV_DISPLAY_ON : EV_DISPLAY_OFF, 0);
+        s.on = want;
+    }
 
     if (jsonGetInt(body, len, "brightness", v)) {
         // HA 0-255 -> percent, never rounding a non-zero level down to 0.
@@ -283,6 +287,7 @@ bool connectNow() {
     g_connects++;
     g_err[0] = 0;
     NetWatch::noteAlive();
+    eventLog(EV_MQTT_UP, (uint8_t)min(g_connects, 255UL));
 
     client.publish(willTopic, "online", true);
 

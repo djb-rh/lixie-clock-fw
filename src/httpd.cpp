@@ -5,6 +5,7 @@
 #include "config.h"
 #include "control.h"
 #include "display.h"
+#include "eventlog.h"
 #include "json.h"
 #include "mqtt_ha.h"
 #include "netwatch.h"
@@ -498,6 +499,27 @@ bool applySchedule(const char *body, size_t len, char *err, size_t errn) {
     return true;
 }
 
+// Oldest-first, so the tail of the list is what happened just before the last
+// failure -- which is the only part anyone reads.
+void serveEvents(TCPClient &c) {
+    const EvLog &L = eventLogData();
+    Out o{g_out, g_out + sizeof(g_out), false};
+    app(o, "{\"boot_id\":%u,\"count\":%u,\"events\":[", L.boot_id, L.count);
+
+    for (uint8_t i = 0; i < L.count; i++) {
+        uint8_t idx = (uint8_t)((L.next + EV_MAX - L.count + i) % EV_MAX);
+        const EvEntry &e = L.e[idx];
+        app(o, "%s{\"boot\":%u,\"t\":%lu,\"ev\":\"%s\",\"arg\":%u}",
+            i ? "," : "", e.boot_id, (unsigned long)e.uptime, eventName(e.code), e.arg);
+    }
+    app(o, "]}");
+
+    if (o.overflow) { sendErr(c, "500 Internal Server Error", "event log too large"); return; }
+    size_t n = (size_t)(o.p - g_out);
+    sendHeaders(c, "200 OK", "application/json", n);
+    c.write((const uint8_t *)g_out, n);
+}
+
 // --- routing ----------------------------------------------------------------
 
 void handle(TCPClient &c, const char *req, const char *body, size_t bodyLen) {
@@ -527,6 +549,8 @@ void handle(TCPClient &c, const char *req, const char *body, size_t bodyLen) {
         serveConfig(c);
     } else if (isGet && !strncmp(path, "/api/schedule", 13)) {
         serveSchedule(c);
+    } else if (isGet && !strncmp(path, "/api/events", 11)) {
+        serveEvents(c);
     } else if (isPost && !strncmp(path, "/api/config", 11)) {
         char err[96] = "";
         if (!applyConfig(body, bodyLen, err, sizeof(err))) {
