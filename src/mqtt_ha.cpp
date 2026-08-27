@@ -74,6 +74,7 @@ bool publishDiscovery() {
            "\"state_topic\":\"~/state\","
            "\"command_topic\":\"~/set\","
            "\"availability_topic\":\"~/status\","
+           "\"qos\":1,"
            "\"brightness\":true,"
            "\"supported_color_modes\":[\"rgb\"],"
            "\"effect\":true,"
@@ -102,6 +103,7 @@ bool publishDiscovery() {
            "\"unique_id\":\"lixie_%s_release\","
            "\"command_topic\":\"~/release\","
            "\"availability_topic\":\"~/status\","
+           "\"qos\":1,"
            "\"icon\":\"mdi:calendar-clock\","
            "\"device\":{\"identifiers\":[\"lixie_%s\"]}}",
         g_base, g_id, g_id);
@@ -302,11 +304,22 @@ bool connectNow() {
 
     client.publish(willTopic, "online", true);
 
+    // QoS 1, not the default 0.
+    //
+    // At QoS 0 the broker sends once and forgets: a command lost to a degraded
+    // link is simply gone, with nothing on either side recording that it ever
+    // existed. That is consistent with a clock that sat dark through what should
+    // have been two "turn on" commands. QoS 1 makes the broker retry until the
+    // clock acknowledges.
+    //
+    // Effective delivery is min(publish QoS, subscribe QoS), so this only helps
+    // if Home Assistant also publishes at QoS 1 -- hence "qos":1 in the
+    // discovery config. Both halves are required; either alone does nothing.
     char sub[96];
     snprintf(sub, sizeof(sub), "%s/set", g_base);
-    client.subscribe(sub);
+    client.subscribe(sub, MQTT::QOS1);
     snprintf(sub, sizeof(sub), "%s/release", g_base);
-    client.subscribe(sub);
+    client.subscribe(sub, MQTT::QOS1);
 
     // Republish discovery on every connect, retained, so a Home Assistant
     // restart re-learns the entities without the clock needing one.
