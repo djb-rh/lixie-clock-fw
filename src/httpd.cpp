@@ -504,7 +504,10 @@ bool applySchedule(const char *body, size_t len, char *err, size_t errn) {
 void serveEvents(TCPClient &c) {
     const EvLog &L = eventLogData();
     Out o{g_out, g_out + sizeof(g_out), false};
-    app(o, "{\"boot_id\":%u,\"count\":%u,\"events\":[", L.boot_id, L.count);
+    const EvAlive &A = eventLogAlive();
+    app(o, "{\"boot_id\":%u,\"count\":%u,"
+           "\"last_alive\":{\"boot\":%u,\"uptime\":%lu},\"events\":[",
+        L.boot_id, L.count, A.boot_id, (unsigned long)A.uptime);
 
     for (uint8_t i = 0; i < L.count; i++) {
         uint8_t idx = (uint8_t)((L.next + EV_MAX - L.count + i) % EV_MAX);

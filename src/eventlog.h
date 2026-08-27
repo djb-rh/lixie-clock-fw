@@ -43,7 +43,22 @@ struct EvLog {
     EvEntry e[EV_MAX];
 };
 
+// Records "the clock was definitely alive at this uptime", so a crash can be
+// bracketed in time. Kept in a SEPARATE EEPROM slot from the ring, so adding it
+// does not change EvLog's layout and does not invalidate existing history.
+struct EvAlive {
+    uint16_t magic;
+    uint16_t boot_id;
+    uint32_t uptime;
+};
+
 void eventLogBegin(uint8_t resetReason);
 void eventLog(uint8_t code, uint8_t arg);
+
+// Must be called from loop(). Performs the deferred EEPROM write and the
+// periodic heartbeat -- see the note in eventlog.cpp about why writes do not
+// happen where the events are raised.
+void eventLogTick();
+const EvAlive &eventLogAlive();
 const EvLog &eventLogData();
 const char *eventName(uint8_t code);

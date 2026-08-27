@@ -4,8 +4,14 @@
 namespace {
 // Well clear of the config struct, which ends around byte 576.
 const int EV_ADDR = 1024;
+const int ALIVE_ADDR = 1400;        // separate slot: adding it changes no layout
 const uint16_t EV_MAGIC = 0x4C58;   // "LX"
+const uint32_t HEARTBEAT_MS = 30UL * 60UL * 1000UL;
+
 EvLog g_log;
+EvAlive g_alive;
+bool g_logDirty = false;
+uint32_t g_lastBeat = 0;
 }  // namespace
 
 void eventLogBegin(uint8_t resetReason) {
@@ -15,7 +21,17 @@ void eventLogBegin(uint8_t resetReason) {
         g_log.magic = EV_MAGIC;
     }
     g_log.boot_id++;
+
+    // Read the previous run's last heartbeat BEFORE it gets overwritten -- it is
+    // the whole point: it says how far the clock got before it stopped.
+    EvAlive prev;
+    EEPROM.get(ALIVE_ADDR, prev);
+    if (prev.magic == EV_MAGIC) g_alive = prev;
+    else { g_alive = EvAlive{}; g_alive.magic = EV_MAGIC; }
+
     eventLog(EV_BOOT, resetReason);
+    EEPROM.put(EV_ADDR, g_log);      // boot record is worth an immediate write
+    g_logDirty = false;
 }
 
 void eventLog(uint8_t code, uint8_t arg) {
@@ -28,10 +44,34 @@ void eventLog(uint8_t code, uint8_t arg) {
     g_log.next = (uint8_t)((g_log.next + 1) % EV_MAX);
     if (g_log.count < EV_MAX) g_log.count++;
 
-    // Written immediately rather than batched: the whole point is surviving a
-    // failure that gives no warning and no chance to flush.
-    EEPROM.put(EV_ADDR, g_log);
+    // Deliberately NOT written here.
+    //
+    // Events are raised from wherever they happen -- including inside the MQTT
+    // receive callback, which is the network stack's own call path. An EEPROM
+    // write is a flash erase/program that stalls for tens of milliseconds, and
+    // doing that from inside a network callback is asking for trouble on a part
+    // this small. The write is deferred to eventLogTick() in the main loop,
+    // which runs within milliseconds anyway.
+    g_logDirty = true;
 }
+
+void eventLogTick() {
+    if (g_logDirty) {
+        g_logDirty = false;
+        EEPROM.put(EV_ADDR, g_log);
+    }
+
+    uint32_t now = millis();
+    if (now - g_lastBeat >= HEARTBEAT_MS) {
+        g_lastBeat = now;
+        g_alive.magic = EV_MAGIC;
+        g_alive.boot_id = g_log.boot_id;
+        g_alive.uptime = now / 1000;
+        EEPROM.put(ALIVE_ADDR, g_alive);
+    }
+}
+
+const EvAlive &eventLogAlive() { return g_alive; }
 
 const EvLog &eventLogData() { return g_log; }
 

@@ -269,5 +269,6 @@ void loop() {
         updateStatus();
     }
 
+    eventLogTick();
     ApplicationWatchdog::checkin();
 }
