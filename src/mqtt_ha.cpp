@@ -35,6 +35,7 @@ uint32_t g_lastHeartbeat = 0;
 uint32_t g_connects = 0;
 uint32_t g_commands = 0;
 bool g_discovered = false;
+bool g_wasConnected = false;
 bool g_dirty = true;
 char g_err[48] = "";
 
@@ -254,12 +255,22 @@ void onMessage(char *topic, byte *payload, unsigned int length) {
     body[n] = 0;
 
     if (strstr(topic, "/release")) {
+        eventLog(EV_CMD_RX, 3);
         Control::releaseOverride();
         g_commands++;
         g_dirty = true;
         return;
     }
-    if (strstr(topic, "/set")) handleSet(body, n);
+    if (strstr(topic, "/set")) {
+        // Logged before handling, and regardless of whether it changes anything:
+        // a run that shows display_off and then nothing for sixty hours cannot
+        // distinguish "no command came" from "commands came and did nothing".
+        uint8_t what = 0;
+        if (strstr(body, "\"ON\"")) what = 1;
+        else if (strstr(body, "\"OFF\"")) what = 2;
+        eventLog(EV_CMD_RX, what);
+        handleSet(body, n);
+    }
 }
 
 bool connectNow() {
@@ -320,7 +331,11 @@ void MqttHa::begin() {
 void MqttHa::tick() {
     if (!configured() || !WiFi.ready()) return;
 
-    if (client.isConnected()) {
+    bool nowConnected = client.isConnected();
+    if (g_wasConnected && !nowConnected) eventLog(EV_MQTT_DOWN, 0);
+    g_wasConnected = nowConnected;
+
+    if (nowConnected) {
         client.loop();
         NetWatch::noteAlive();   // the broker link is live
 
