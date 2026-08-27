@@ -146,6 +146,31 @@ bool publishDiscovery() {
     return true;
 }
 
+// Compact on purpose: the tail is what matters, and it has to fit the MQTT
+// buffer. The full ring stays available over HTTP when the clock is reachable.
+void publishEvents() {
+    const EvLog &L = eventLogData();
+    const EvAlive &A = eventLogAlive();
+
+    Out o{g_buf, g_buf + sizeof(g_buf), false};
+    app(o, "{\"boot\":%u,\"alive\":{\"b\":%u,\"t\":%lu},\"tail\":[",
+        L.boot_id, A.boot_id, (unsigned long)A.uptime);
+
+    const uint8_t WANT = 14;
+    uint8_t n = L.count < WANT ? L.count : WANT;
+    for (uint8_t i = 0; i < n; i++) {
+        uint8_t idx = (uint8_t)((L.next + EV_MAX - n + i) % EV_MAX);
+        const EvEntry &e = L.e[idx];
+        app(o, "%s[%u,%lu,\"%s\",%u]", i ? "," : "", e.boot_id,
+            (unsigned long)e.uptime, eventName(e.code), e.arg);
+    }
+    app(o, "]}");
+    if (o.overflow) return;
+
+    snprintf(g_topic, sizeof(g_topic), "%s/events", g_base);
+    client.publish(g_topic, g_buf, true);
+}
+
 void publishState() {
     Control::Settings a = Control::active();
 
@@ -320,6 +345,14 @@ bool connectNow() {
     client.subscribe(sub, MQTT::QOS1);
     snprintf(sub, sizeof(sub), "%s/release", g_base);
     client.subscribe(sub, MQTT::QOS1);
+
+    // Publish the black box on connect, retained.
+    //
+    // When this thing wedges it goes fully off the network, so the log can only
+    // be read after a power cycle -- an extra step, done by a person, at which
+    // evidence gets lost. Pushing it to a retained topic on the way up means the
+    // recovery boot delivers its own post-mortem with nobody having to remember.
+    publishEvents();
 
     // Republish discovery on every connect, retained, so a Home Assistant
     // restart re-learns the entities without the clock needing one.
