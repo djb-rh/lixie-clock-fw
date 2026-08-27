@@ -55,6 +55,14 @@ SunTimes sunToday();
 // and only an explicit release hands control back to the schedule. Nothing
 // silently undoes what an automation did -- a schedule transition arriving
 // later must not quietly stomp it.
+//
+// The override deliberately does NOT survive a reboot. That looks like an
+// oversight and is not: a clock that comes back lit is the owner's clearest
+// signal that it restarted. Persisting an "off" would make a dark clock
+// ambiguous -- crashed, or off as intended? -- and that ambiguity costs more
+// than the brief disagreement with Home Assistant, which re-syncs at the next
+// automation event anyway. Decided deliberately; do not "fix" it without asking
+// whoever is living with the clock.
 void setOverride(const Settings &s);
 void releaseOverride();
 bool overridden();
