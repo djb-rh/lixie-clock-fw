@@ -89,6 +89,7 @@ const char *eventName(uint8_t code) {
         case EV_DISPLAY_ON:  return "display_on";
         case EV_MQTT_DOWN:   return "mqtt_down";
         case EV_CMD_RX:      return "cmd_rx";
+        case EV_RX_STALL:    return "rx_stall";
         default:             return "?";
     }
 }

@@ -25,6 +25,7 @@ enum : uint8_t {
     EV_DISPLAY_ON  = 10,
     EV_MQTT_DOWN   = 11,  // the broker link went away
     EV_CMD_RX      = 12,  // a command arrived: arg 1=ON, 2=OFF, 3=release, 0=other
+    EV_RX_STALL    = 13,  // loopback stopped returning: inbound path is dead
 };
 
 const uint8_t EV_MAX = 40;

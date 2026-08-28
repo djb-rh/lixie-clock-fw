@@ -19,6 +19,7 @@ bool connected();
 bool configured();            // false when no broker host is set
 uint32_t connectCount();
 uint32_t commandCount();
+uint32_t rxStalls();      // times the inbound path was found dead
 const char *lastError();
 
 // Push state to HA now, rather than waiting for the heartbeat. Called whenever

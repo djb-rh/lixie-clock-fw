@@ -36,6 +36,25 @@ uint32_t g_connects = 0;
 uint32_t g_commands = 0;
 bool g_discovered = false;
 bool g_wasConnected = false;
+
+// Inbound-liveness loopback.
+//
+// The clock published diagnostics every 30 seconds for fifteen hours while
+// receiving nothing, and never noticed: this library only discovers a dead link
+// when a WRITE fails, and writes were succeeding the whole time. isConnected()
+// stayed true, so no reconnect was ever attempted and every command in that
+// window was lost in silence.
+//
+// So prove the inbound path instead of assuming it. The clock publishes a nonce
+// to a topic it subscribes to and waits for the broker to hand it back. That is
+// a true end-to-end test: it exercises the same receive path commands use. If
+// the echo stops coming, the link is half-dead and only a reconnect will fix it.
+const uint32_t PING_INTERVAL_MS = 5UL * 60UL * 1000UL;
+const uint32_t PING_STALL_MS = 16UL * 60UL * 1000UL;   // three missed rounds
+uint32_t g_lastPingSent = 0;
+uint32_t g_lastPingEcho = 0;
+uint32_t g_pingNonce = 0;
+uint32_t g_rxStalls = 0;
 bool g_dirty = true;
 char g_err[48] = "";
 
@@ -281,6 +300,11 @@ void onMessage(char *topic, byte *payload, unsigned int length) {
     memcpy(body, payload, n);
     body[n] = 0;
 
+    if (strstr(topic, "/ping")) {
+        g_lastPingEcho = millis();       // the inbound path is demonstrably alive
+        NetWatch::noteAlive();
+        return;
+    }
     if (strstr(topic, "/release")) {
         eventLog(EV_CMD_RX, 3);
         Control::releaseOverride();
@@ -296,6 +320,7 @@ void onMessage(char *topic, byte *payload, unsigned int length) {
         if (strstr(body, "\"ON\"")) what = 1;
         else if (strstr(body, "\"OFF\"")) what = 2;
         eventLog(EV_CMD_RX, what);
+        NetWatch::noteAlive();
         handleSet(body, n);
     }
 }
@@ -345,6 +370,11 @@ bool connectNow() {
     client.subscribe(sub, MQTT::QOS1);
     snprintf(sub, sizeof(sub), "%s/release", g_base);
     client.subscribe(sub, MQTT::QOS1);
+    snprintf(sub, sizeof(sub), "%s/ping", g_base);
+    client.subscribe(sub, MQTT::QOS0);   // loopback; retries would defeat the test
+
+    g_lastPingEcho = millis();           // grace period before the first round
+    g_lastPingSent = 0;
 
     // Publish the black box on connect, retained.
     //
@@ -383,9 +413,38 @@ void MqttHa::tick() {
 
     if (nowConnected) {
         client.loop();
-        NetWatch::noteAlive();   // the broker link is live
+
+        // NOT noteAlive() here.
+        //
+        // "isConnected() is true" was exactly the lie that let a clock sit deaf
+        // for fifteen hours, and calling it proof of life would let that same
+        // lie defeat the no-traffic reboot backstop as well -- the one layer
+        // meant to catch a link the firmware cannot see is broken. Liveness is
+        // now claimed only where something was actually RECEIVED: the loopback
+        // echo, an arriving command, or a completed connect.
 
         uint32_t now = millis();
+
+        if (now - g_lastPingSent >= PING_INTERVAL_MS) {
+            g_lastPingSent = now;
+            char t[96], n[16];
+            snprintf(t, sizeof(t), "%s/ping", g_base);
+            snprintf(n, sizeof(n), "%lu", (unsigned long)(++g_pingNonce));
+            client.publish(t, n);        // NOT retained: this is a liveness probe
+        }
+
+        if (now - g_lastPingEcho >= PING_STALL_MS) {
+            // Publishing works and receiving does not. Nothing else detects this,
+            // and it silently eats every command until something reboots.
+            eventLog(EV_RX_STALL, (uint8_t)min((now - g_lastPingEcho) / 60000, 255UL));
+            g_rxStalls++;
+            snprintf(g_err, sizeof(g_err), "inbound stalled; forcing reconnect");
+            client.disconnect();
+            g_wasConnected = false;
+            g_lastPingEcho = now;        // give the fresh session a fair chance
+            return;
+        }
+
         if (g_dirty || (now - g_lastHeartbeat) >= HEARTBEAT_MS) {
             g_dirty = false;
             g_lastHeartbeat = now;
@@ -411,5 +470,6 @@ bool MqttHa::connected() { return client.isConnected(); }
 bool MqttHa::configured() { return cfg.mqtt_host[0] != 0; }
 uint32_t MqttHa::connectCount() { return g_connects; }
 uint32_t MqttHa::commandCount() { return g_commands; }
+uint32_t MqttHa::rxStalls() { return g_rxStalls; }
 const char *MqttHa::lastError() { return g_err; }
 void MqttHa::notifyChanged() { g_dirty = true; }
