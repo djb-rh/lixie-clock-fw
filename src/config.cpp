@@ -28,6 +28,7 @@ static void clampLoaded() {
     if (cfg.observe_dst > 1) cfg.observe_dst = 1;
     cfg.tz[sizeof(cfg.tz) - 1] = 0;
     cfg.ntp_server[sizeof(cfg.ntp_server) - 1] = 0;
+    cfg.ha_id[sizeof(cfg.ha_id) - 1] = 0;
 }
 
 bool configLoad() {

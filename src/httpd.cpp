@@ -270,11 +270,13 @@ void serveConfig(TCPClient &c) {
         "\"digits\":%u,\"hour_format\":%u,\"blank_hour_zero\":%u,"
         "\"observe_dst\":%u,"
         "\"mode\":%u,\"effect\":%u,\"r\":%u,\"g\":%u,\"b\":%u,\"brightness\":%u,"
+        "\"ha_id\":\"%s\","
         "\"mqtt_host\":\"%s\",\"mqtt_port\":%u,\"mqtt_user\":\"%s\","
         "\"has_mqtt_pass\":%s,\"has_web_pass\":%s}",
         cfg.tz, cfg.ntp_server, (double)cfg.lat, (double)cfg.lon,
         cfg.digits, cfg.hour_format, cfg.blank_hour_zero, cfg.observe_dst,
         cfg.mode, cfg.effect, cfg.r, cfg.g, cfg.b, cfg.brightness,
+        cfg.ha_id,
         cfg.mqtt_host, cfg.mqtt_port, cfg.mqtt_user,
         cfg.mqtt_pass[0] ? "true" : "false",
         cfg.web_pass[0] ? "true" : "false");
@@ -377,6 +379,22 @@ bool applyConfig(const char *body, size_t len, char *err, size_t errn) {
         applied++;
     }
 
+    if (jsonGetStr(body, len, "ha_id", sbuf, sizeof(sbuf))) {
+        // Goes straight into MQTT topics and Home Assistant unique_ids, so
+        // restrict it to characters that are safe in both. An empty value means
+        // "go back to deriving it from the Particle device id".
+        bool ok = strlen(sbuf) < sizeof(cfg.ha_id);
+        for (const char *q = sbuf; ok && *q; q++)
+            ok = isalnum((unsigned char)*q) || *q == '_' || *q == '-';
+        if (!ok) {
+            snprintf(err, errn, "ha_id must be short and alphanumeric");
+            return false;
+        }
+        strncpy(cfg.ha_id, sbuf, sizeof(cfg.ha_id) - 1);
+        cfg.ha_id[sizeof(cfg.ha_id) - 1] = 0;
+        MqttHa::refreshIdentity();
+        applied++;
+    }
     if (jsonGetStr(body, len, "mqtt_host", sbuf, sizeof(sbuf))) {
         strncpy(cfg.mqtt_host, sbuf, sizeof(cfg.mqtt_host) - 1);
         cfg.mqtt_host[sizeof(cfg.mqtt_host) - 1] = 0;

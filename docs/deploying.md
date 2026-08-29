@@ -87,10 +87,30 @@ Home Assistant has a static DHCP lease, so `10.0.0.18` is stable.
 `Lixie Clock <id>`, where `<id>` is the last six characters of the Particle device ID. Each
 clock gets its own id, so both appear separately.
 
-| Device | Home Assistant name | IP |
+| Device | Home Assistant name | Notes |
 |---|---|---|
-| `shop-clock` | `Lixie Clock 343437` | 10.0.1.14 |
-| `Clock2` | `Lixie Clock 373132` | 10.0.1.167 |
+| `shop-clock` | `Lixie Clock 343437` | identity derived from the chip |
+| `pbclock` | `Lixie Clock 373132` | **adopted** identity via `ha_id`, replacing `Clock2` |
+
+### Replacing a board without losing its Home Assistant identity
+
+The Home Assistant device id defaults to the last six characters of the Particle
+device id, so a replacement board would normally appear as a brand new device and
+orphan every automation, dashboard card and history graph pointing at the old one.
+
+Set `ha_id` on the replacement to the retiring board's id instead, and it adopts
+that identity outright:
+
+```bash
+curl -XPOST -H'Content-Type: application/json' \
+     -d '{"ha_id":"373132"}' http://<new-clock-ip>/api/config
+```
+
+It rides along in the config backup, so restoring a backup onto a new board
+carries the identity with it.
+
+**Never run both boards at once with the same `ha_id`** — they would publish to
+the same topics and fight over the same entities.
 
 ## Rolling back
 

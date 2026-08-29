@@ -80,10 +80,20 @@ struct Config {
     // migration is a field-by-field copy rather than a reinterpretation.
     uint8_t observe_dst;         // 0 = ignore the rule's DST half, stay on standard time
 
+    // The identity this clock presents to Home Assistant. Empty means "derive it
+    // from the Particle device id", which is what every clock did originally.
+    //
+    // Made settable because the hardware id is the wrong thing to weld an
+    // identity to: replacing a failed board then means a brand new device in
+    // Home Assistant and every automation, dashboard and history entry pointing
+    // at the old one. Setting this lets a replacement adopt the dead board's
+    // identity, and it rides along in the config backup.
+    char ha_id[8];
+
     // Spend from this before growing the struct again. Adding a field inside
     // reserved space needs no migration and no version bump, which is the whole
     // point of carrying it.
-    uint8_t reserved[15];
+    uint8_t reserved[7];
 
     uint16_t crc;
 };

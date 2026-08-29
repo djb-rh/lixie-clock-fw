@@ -394,14 +394,28 @@ bool connectNow() {
 
 }  // namespace
 
-void MqttHa::begin() {
-    String did = System.deviceID();
-    const char *s = did.c_str();
-    size_t n = strlen(s);
-    snprintf(g_id, sizeof(g_id), "%s", n > 6 ? s + n - 6 : s);
-
+static void deriveIdentity() {
+    if (cfg.ha_id[0]) {
+        snprintf(g_id, sizeof(g_id), "%s", cfg.ha_id);
+    } else {
+        String did = System.deviceID();
+        const char *s = did.c_str();
+        size_t n = strlen(s);
+        snprintf(g_id, sizeof(g_id), "%s", n > 6 ? s + n - 6 : s);
+    }
     snprintf(g_base, sizeof(g_base), "lixie/%s", g_id);
     snprintf(g_name, sizeof(g_name), "Lixie Clock %s", g_id);
+}
+
+void MqttHa::begin() { deriveIdentity(); }
+
+void MqttHa::refreshIdentity() {
+    deriveIdentity();
+    // Topics and unique_ids both changed, so the old session is meaningless.
+    // Dropping it forces a reconnect that resubscribes and republishes
+    // discovery under the new identity.
+    if (client.isConnected()) client.disconnect();
+    g_wasConnected = false;
 }
 
 void MqttHa::tick() {

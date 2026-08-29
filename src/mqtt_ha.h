@@ -13,6 +13,9 @@
 namespace MqttHa {
 
 void begin();
+
+// Recompute the Home Assistant identity from config and reconnect under it.
+void refreshIdentity();
 void tick();
 
 bool connected();

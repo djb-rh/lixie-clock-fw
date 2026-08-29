@@ -43,7 +43,8 @@ default brightness of 60% reduces it further.
 | Name | Device ID | Notes |
 |---|---|---|
 | `shop-clock` | `290028001047363333343437` | Plain developer device. All development happened here. |
-| `Clock2` | `270049000251353530373132` | Claimed to Particle Product 42326, but flashes normally with `particle flash` |
+| `Clock2` | `270049000251353530373132` | Claimed to Particle Product 42326. **Suspect hardware** — hung repeatedly with no software fault; retired in favour of `pbclock` |
+| `pbclock` | `3d001a000e51353532343635` | Replacement for `Clock2` in the picklebarn. Runs with `ha_id=373132` so it keeps Clock2's Home Assistant identity |
 
 `shop-clock` sits at about **−71 dBm** RSSI. Workable, but the weak end of usable, and the
 first thing to suspect if that clock ever misbehaves on the network. `Clock2` is far
