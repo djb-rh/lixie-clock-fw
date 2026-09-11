@@ -43,9 +43,9 @@ default brightness of 60% reduces it further.
 | Name | Device ID | Notes |
 |---|---|---|
 | `shop-clock` | `290028001047363333343437` | Plain developer device. All development happened here. |
-| `Clock2` | `270049000251353530373132` | Claimed to Particle Product 42326. **Suspect hardware** — hung repeatedly with no software fault; retired in favour of `pbclock` |
-| `pbclock` | `3d001a000e51353532343635` | **Known-bad board** — had already been pulled from another job for crashing; failed here too, as expected. Its death says nothing about the location |
-| `clubhouse_gate2` | `34001f000647373336323230` | Current picklebarn clock. Name is a leftover from a previous job; runs with `ha_id=373132` to keep Clock2's Home Assistant identity |
+| ~~`Clock2`~~ | `270049000251353530373132` | **Binned.** Hung repeatedly with no software fault; new PSU made no difference |
+| ~~`pbclock`~~ | `3d001a000e51353532343635` | **Binned.** Already retired from another job for crashing before it was used here, so its failure is not evidence about the location |
+| `pbclock2` | `34001f000647373336323230` | Current picklebarn clock. Runs with `ha_id=373132` to keep Clock2's Home Assistant identity. (Was named `clubhouse_gate2` when repurposed; renamed.) |
 
 `shop-clock` sits at about **−71 dBm** RSSI — workable, but the weak end of usable. The
 picklebarn clock runs far stronger, in the −35 to −60 dBm range depending on the board.
@@ -60,9 +60,11 @@ firmware for weeks without a single spontaneous reset. The firmware is not the v
    no difference.
 2. `pbclock` — died too, but it was a board already retired from another job for
    crashing, so it proves nothing either way.
-3. `clubhouse_gate2` — current. First board in that spot with no prior history of
-   trouble, which makes it the first real test of whether the position or the boards
-   were at fault.
+3. `pbclock2` — current. First board in that spot with no prior history of trouble,
+   which makes it the first real test of whether the position or the boards were at
+   fault.
+
+The first two boards have been binned.
 
 ## Platform constraints worth remembering
 

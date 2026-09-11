@@ -90,7 +90,7 @@ clock gets its own id, so both appear separately.
 | Device | Home Assistant name | Notes |
 |---|---|---|
 | `shop-clock` | `Lixie Clock 343437` | identity derived from the chip |
-| `clubhouse_gate2` | `Lixie Clock 373132` | **adopted** identity via `ha_id`. Particle name is a leftover from an earlier job — it is the picklebarn clock |
+| `pbclock2` | `Lixie Clock 373132` | **adopted** identity via `ha_id`, third board to hold this identity |
 
 ### Replacing a board without losing its Home Assistant identity
 
