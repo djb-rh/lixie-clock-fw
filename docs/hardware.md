@@ -44,11 +44,25 @@ default brightness of 60% reduces it further.
 |---|---|---|
 | `shop-clock` | `290028001047363333343437` | Plain developer device. All development happened here. |
 | `Clock2` | `270049000251353530373132` | Claimed to Particle Product 42326. **Suspect hardware** — hung repeatedly with no software fault; retired in favour of `pbclock` |
-| `pbclock` | `3d001a000e51353532343635` | Replacement for `Clock2` in the picklebarn. Runs with `ha_id=373132` so it keeps Clock2's Home Assistant identity |
+| `pbclock` | `3d001a000e51353532343635` | **Known-bad board** — had already been pulled from another job for crashing; failed here too, as expected. Its death says nothing about the location |
+| `clubhouse_gate2` | `34001f000647373336323230` | Current picklebarn clock. Name is a leftover from a previous job; runs with `ha_id=373132` to keep Clock2's Home Assistant identity |
 
-`shop-clock` sits at about **−71 dBm** RSSI. Workable, but the weak end of usable, and the
-first thing to suspect if that clock ever misbehaves on the network. `Clock2` is far
-healthier at about **−39 dBm**.
+`shop-clock` sits at about **−71 dBm** RSSI — workable, but the weak end of usable. The
+picklebarn clock runs far stronger, in the −35 to −60 dBm range depending on the board.
+
+### The picklebarn board history
+
+That position has now consumed three Photons while `shop-clock` has run the identical
+firmware for weeks without a single spontaneous reset. The firmware is not the variable:
+
+1. `Clock2` — hung repeatedly, always with the instrumentation reporting a perfectly
+   healthy system right up to the instant it stopped. Power supply was swapped and made
+   no difference.
+2. `pbclock` — died too, but it was a board already retired from another job for
+   crashing, so it proves nothing either way.
+3. `clubhouse_gate2` — current. First board in that spot with no prior history of
+   trouble, which makes it the first real test of whether the position or the boards
+   were at fault.
 
 ## Platform constraints worth remembering
 
